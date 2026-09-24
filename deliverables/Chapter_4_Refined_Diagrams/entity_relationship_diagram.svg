@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1620" viewBox="0 0 2400 1620">
+  <defs>
+    <style>
+      .bg{fill:#f8fbff}.title{font:700 38px Arial,sans-serif;fill:#103b66}.sub{font:18px Arial,sans-serif;fill:#55718c}.entity{fill:#fff;stroke:#2c6faa;stroke-width:3}.head{fill:#1f5d96}.h{font:700 20px Arial,sans-serif;fill:#fff}.f{font:18px Arial,sans-serif;fill:#17324d}.pk{font-weight:700;fill:#0f4e87}.fk{fill:#7a3d00}.rel{fill:none;stroke:#6f8397;stroke-width:3}.rlabel{font:16px Arial,sans-serif;fill:#43596e}.badge{fill:#e8f2fb;stroke:#90b7da;stroke-width:1.5}.btxt{font:700 16px Arial,sans-serif;fill:#245b8e}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10Z" fill="#6f8397"/></marker>
+  </defs>
+  <rect class="bg" width="2400" height="1620"/>
+  <text x="80" y="78" class="title">ENTITY-RELATIONSHIP DIAGRAM</text>
+  <text x="80" y="112" class="sub">Smart Asset Management System - core operational data model</text>
+  <g transform="translate(1890 48)"><rect width="420" height="74" rx="12" class="badge"/><text x="22" y="30" class="btxt">Notation</text><text x="22" y="56" class="f">PK = primary key  |  FK = foreign key</text></g>
+
+  <!-- relationships drawn first -->
+  <path class="rel" marker-end="url(#arrow)" d="M450 332 C535 332 545 332 630 332"/><text x="505" y="316" class="rlabel">1 assigns 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M900 430 C900 530 900 550 900 650"/><text x="914" y="545" class="rlabel">1 has 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M1170 332 C1255 332 1265 332 1350 332"/><text x="1217" y="316" class="rlabel">1 produces 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M1170 385 C1270 450 1275 680 1350 740"/><text x="1205" y="555" class="rlabel">1 logs 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M450 375 C735 530 1000 740 1350 790"/><text x="740" y="674" class="rlabel">1 reports 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M450 395 C680 710 710 1100 800 1190"/><text x="530" y="910" class="rlabel">1 appears in 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M450 1025 C545 1015 550 1000 630 990"/><text x="505" y="970" class="rlabel">1 receives 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M900 1090 C900 1135 900 1145 900 1190"/><text x="914" y="1150" class="rlabel">1 is recorded in 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M1170 990 C1260 990 1265 990 1350 990"/><text x="1212" y="972" class="rlabel">1 creates 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M1170 1040 C1270 1140 1270 1260 1350 1280"/><text x="1220" y="1175" class="rlabel">1 records 0..*</text>
+  <path class="rel" marker-end="url(#arrow)" d="M450 1045 C735 1200 1020 1350 1350 1360"/><text x="735" y="1322" class="rlabel">1 audits 0..*</text>
+
+  <!-- Users -->
+  <g transform="translate(140 180)"><rect class="entity" width="310" height="250" rx="14"/><rect class="head" width="310" height="52" rx="14"/><rect class="head" y="38" width="310" height="14"/><text x="20" y="34" class="h">USERS</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f">full_name, email</text><text x="20" y="140" class="f">department, organisation_rank</text><text x="20" y="168" class="f">role, status</text><text x="20" y="196" class="f">created_at</text><text x="20" y="228" class="sub">Accounts and access control</text></g>
+  <!-- laptops -->
+  <g transform="translate(630 180)"><rect class="entity" width="540" height="250" rx="14"/><rect class="head" width="540" height="52" rx="14"/><rect class="head" y="38" width="540" height="14"/><text x="20" y="34" class="h">LAPTOPS</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f">asset_tag, serial_number, brand, model</text><text x="20" y="140" class="f">processor_tier, ram_gb, storage_gb</text><text x="20" y="168" class="f fk">FK  assigned_to → users.id</text><text x="20" y="196" class="f">department, status, warranty_expiry</text><text x="20" y="228" class="sub">Central managed asset</text></g>
+  <!-- maintenance -->
+  <g transform="translate(1350 180)"><rect class="entity" width="430" height="250" rx="14"/><rect class="head" width="430" height="52" rx="14"/><rect class="head" y="38" width="430" height="14"/><text x="20" y="34" class="h">MAINTENANCE_RECORDS</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f fk">FK  laptop_id → laptops.id</text><text x="20" y="140" class="f fk">FK  reported_by → users.id</text><text x="20" y="168" class="f">issue_description, repair_cost</text><text x="20" y="196" class="f">status, repaired_at, created_at</text><text x="20" y="228" class="sub">Repair and issue records</text></g>
+  <!-- usage -->
+  <g transform="translate(1350 650)"><rect class="entity" width="430" height="200" rx="14"/><rect class="head" width="430" height="52" rx="14"/><rect class="head" y="38" width="430" height="14"/><text x="20" y="34" class="h">DEVICE_USAGE_DAILY</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f fk">FK  laptop_id → laptops.id</text><text x="20" y="140" class="f">usage_date, active_hours</text><text x="20" y="168" class="f">crash_count, battery_health_percent</text></g>
+  <!-- risk -->
+  <g transform="translate(1350 900)"><rect class="entity" width="430" height="190" rx="14"/><rect class="head" width="430" height="52" rx="14"/><rect class="head" y="38" width="430" height="14"/><text x="20" y="34" class="h">MAINTENANCE_RISK_PREDICTIONS</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f fk">FK  laptop_id → laptops.id</text><text x="20" y="140" class="f">risk_score, risk_level</text><text x="20" y="168" class="f">model_version, predicted_at</text></g>
+  <!-- history -->
+  <g transform="translate(630 1190)"><rect class="entity" width="540" height="210" rx="14"/><rect class="head" width="540" height="52" rx="14"/><rect class="head" y="38" width="540" height="14"/><text x="20" y="34" class="h">LAPTOP_HISTORY</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f fk">FK  laptop_id → laptops.id    FK  user_id → users.id</text><text x="20" y="140" class="f fk">FK  admin_id → users.id</text><text x="20" y="168" class="f">action_type, action_date</text><text x="20" y="194" class="sub">Lifecycle and assignment evidence</text></g>
+  <!-- software -->
+  <g transform="translate(140 900)"><rect class="entity" width="310" height="190" rx="14"/><rect class="head" width="310" height="52" rx="14"/><rect class="head" y="38" width="310" height="14"/><text x="20" y="34" class="h">SOFTWARES</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f">software_name, vendor, version</text><text x="20" y="140" class="f">license_type, total_licenses</text><text x="20" y="168" class="f">status, expiry_date</text></g>
+  <!-- assignments -->
+  <g transform="translate(630 900)"><rect class="entity" width="540" height="190" rx="14"/><rect class="head" width="540" height="52" rx="14"/><rect class="head" y="38" width="540" height="14"/><text x="20" y="34" class="h">SOFTWARE_ASSIGNMENTS</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f fk">FK  software_id → softwares.id    FK  user_id → users.id</text><text x="20" y="140" class="f fk">FK  assigned_by / revoked_by → users.id</text><text x="20" y="168" class="f">assigned_date, revoked_at</text></g>
+  <!-- audit -->
+  <g transform="translate(1350 1190)"><rect class="entity" width="430" height="190" rx="14"/><rect class="head" width="430" height="52" rx="14"/><rect class="head" y="38" width="430" height="14"/><text x="20" y="34" class="h">AUDIT_LOGS</text><text x="20" y="84" class="f pk">PK  id</text><text x="20" y="112" class="f fk">FK  user_id → users.id</text><text x="20" y="140" class="f">action, entity_type, entity_id</text><text x="20" y="168" class="f">metadata, created_at</text></g>
+  <text x="80" y="1548" class="sub">Relationships reflect the MySQL schema. “0..*” means an optional one-to-many relationship; foreign keys preserve referential integrity.</text>
+</svg>

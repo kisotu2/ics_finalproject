@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Updated Conceptual Framework for the Smart Asset Management System</title>
+  <desc id="desc">A flow from system inputs to the PHP web system and MySQL database, then to predictive maintenance, location intelligence, and reporting outputs. Security and audit controls apply throughout.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f8fafc}.frame{fill:#fff;stroke:#cbd5e1;stroke-width:2}.box{stroke-width:2}.h{font:700 24px Arial,sans-serif;fill:#172554}.sub{font:400 15px Arial,sans-serif;fill:#475569}.bt{font:700 18px Arial,sans-serif;fill:#0f172a}.t{font:400 16px Arial,sans-serif;fill:#1e293b}.small{font:400 13px Arial,sans-serif;fill:#334155}.cap{font:700 14px Arial,sans-serif;fill:#334155;letter-spacing:1px}.arrow{stroke:#334155;stroke-width:2.5;fill:none;marker-end:url(#a)}.dashed{stroke-dasharray:7 6}.pill{font:700 13px Arial,sans-serif;fill:#334155}
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#334155"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#94a3b8" flood-opacity=".25"/></filter>
+  </defs>
+  <rect class="bg" width="1600" height="1000"/>
+  <rect class="frame" x="24" y="20" width="1552" height="955" rx="28"/>
+  <text class="h" x="800" y="64" text-anchor="middle">SMART ASSET MANAGEMENT SYSTEM</text>
+  <text class="sub" x="800" y="91" text-anchor="middle">Updated conceptual framework: asset management, predictive maintenance and consent-based location intelligence</text>
+
+  <!-- Inputs -->
+  <text class="cap" x="88" y="143">INPUTS</text>
+  <g filter="url(#shadow)"><rect class="box" x="70" y="160" width="315" height="440" rx="20" fill="#fff7e6" stroke="#eab308"/></g>
+  <text class="bt" x="100" y="200">Operational and user data</text>
+  <text class="t" x="100" y="238"><tspan x="100" dy="0">• Hardware asset details</tspan><tspan x="100" dy="27">  (tag, serial, brand, model)</tspan><tspan x="100" dy="32">• User, role and department data</tspan><tspan x="100" dy="32">• Asset assignment and status</tspan><tspan x="100" dy="32">• Software licences and allocations</tspan><tspan x="100" dy="32">• Maintenance records and usage</tspan><tspan x="100" dy="27">  (hours, crashes, battery health)</tspan><tspan x="100" dy="32">• Consent-based location check-ins</tspan><tspan x="100" dy="32">• Approved-area definitions</tspan></text>
+  <rect x="100" y="535" width="250" height="36" rx="18" fill="#fef3c7"/><text class="pill" x="225" y="558" text-anchor="middle">Administrators and authorised users</text>
+
+  <!-- Core -->
+  <text class="cap" x="500" y="143">CORE APPLICATION</text>
+  <g filter="url(#shadow)"><rect class="box" x="430" y="160" width="365" height="440" rx="20" fill="#eaf2ff" stroke="#2563eb"/></g>
+  <text class="bt" x="612" y="200" text-anchor="middle">PHP Web Application</text>
+  <line x1="465" y1="219" x2="760" y2="219" stroke="#93c5fd" stroke-width="2"/>
+  <text class="t" x="468" y="251"><tspan x="468" dy="0">• Authentication and role-based access</tspan><tspan x="468" dy="35">• Asset registration, assignment and lifecycle</tspan><tspan x="468" dy="35">• Software licence and user allocation</tspan><tspan x="468" dy="35">• Maintenance issue and usage capture</tspan><tspan x="468" dy="35">• Location check-in and approved-area review</tspan><tspan x="468" dy="35">• Dashboards, histories and exports</tspan></text>
+  <rect x="474" y="522" width="277" height="48" rx="10" fill="#dbeafe" stroke="#93c5fd"/><text class="small" x="612" y="543" text-anchor="middle">CSRF-protected forms • prepared queries</text><text class="small" x="612" y="561" text-anchor="middle">session controls</text>
+
+  <!-- Data -->
+  <text class="cap" x="902" y="143">PERSISTENT DATA</text>
+  <g filter="url(#shadow)"><rect class="box" x="835" y="160" width="315" height="440" rx="20" fill="#eefcf4" stroke="#16a34a"/></g>
+  <text class="bt" x="992" y="200" text-anchor="middle">MySQL Database</text>
+  <line x1="866" y1="219" x2="1119" y2="219" stroke="#86efac" stroke-width="2"/>
+  <text class="t" x="873" y="253"><tspan x="873" dy="0">• Users and roles</tspan><tspan x="873" dy="34">• Hardware assets and assignments</tspan><tspan x="873" dy="34">• Software licences and allocations</tspan><tspan x="873" dy="34">• Maintenance and daily usage records</tspan><tspan x="873" dy="34">• Maintenance risk predictions</tspan><tspan x="873" dy="34">• Last-known device locations</tspan><tspan x="873" dy="34">• Approved areas, alerts and audit logs</tspan></text>
+  <rect x="878" y="522" width="228" height="48" rx="10" fill="#dcfce7" stroke="#86efac"/><text class="small" x="992" y="543" text-anchor="middle">Structured data storage</text><text class="small" x="992" y="561" text-anchor="middle">and traceable history</text>
+
+  <!-- Intelligence -->
+  <text class="cap" x="1253" y="143">INTELLIGENCE AND INTEGRATIONS</text>
+  <g filter="url(#shadow)"><rect class="box" x="1190" y="160" width="325" height="205" rx="20" fill="#f5eeff" stroke="#9333ea"/></g>
+  <text class="bt" x="1353" y="199" text-anchor="middle">Predictive Maintenance</text>
+  <text class="t" x="1221" y="237"><tspan x="1221" dy="0">Local logistic-regression inference</tspan><tspan x="1221" dy="31">• Repair history and open repairs</tspan><tspan x="1221" dy="31">• Asset age and warranty remaining</tspan><tspan x="1221" dy="31">• Usage, crashes and battery health</tspan><tspan x="1221" dy="31">→ Low / Medium / High risk score</tspan></text>
+  <g filter="url(#shadow)"><rect class="box" x="1190" y="395" width="325" height="205" rx="20" fill="#fff1f2" stroke="#e11d48"/></g>
+  <text class="bt" x="1353" y="434" text-anchor="middle">Location and Notification Services</text>
+  <text class="t" x="1221" y="472"><tspan x="1221" dy="0">• Browser geolocation after consent</tspan><tspan x="1221" dy="31">• Google Maps last-known-location view</tspan><tspan x="1221" dy="31">• Approved-area boundary comparison</tspan><tspan x="1221" dy="31">• In-app alert and optional email notice</tspan><tspan x="1221" dy="31">• No continuous covert tracking</tspan></text>
+
+  <!-- Outputs -->
+  <text class="cap" x="88" y="685">OUTPUTS AND DECISIONS</text>
+  <g filter="url(#shadow)"><rect class="box" x="70" y="705" width="1445" height="150" rx="20" fill="#eff6ff" stroke="#0891b2"/></g>
+  <g>
+    <rect x="98" y="730" width="250" height="95" rx="12" fill="#fff" stroke="#bae6fd"/><text class="bt" x="223" y="761" text-anchor="middle">Asset visibility</text><text class="small" x="223" y="786" text-anchor="middle">status, assignment and lifecycle</text><text class="small" x="223" y="806" text-anchor="middle">management</text>
+    <rect x="380" y="730" width="250" height="95" rx="12" fill="#fff" stroke="#bae6fd"/><text class="bt" x="505" y="761" text-anchor="middle">Maintenance decisions</text><text class="small" x="505" y="786" text-anchor="middle">risk scores, prioritisation</text><text class="small" x="505" y="806" text-anchor="middle">and repair action</text>
+    <rect x="662" y="730" width="250" height="95" rx="12" fill="#fff" stroke="#bae6fd"/><text class="bt" x="787" y="761" text-anchor="middle">Location assurance</text><text class="small" x="787" y="786" text-anchor="middle">last-known maps and</text><text class="small" x="787" y="806" text-anchor="middle">approved-area alerts</text>
+    <rect x="944" y="730" width="250" height="95" rx="12" fill="#fff" stroke="#bae6fd"/><text class="bt" x="1069" y="761" text-anchor="middle">Software governance</text><text class="small" x="1069" y="786" text-anchor="middle">licence availability and</text><text class="small" x="1069" y="806" text-anchor="middle">allocation reports</text>
+    <rect x="1226" y="730" width="250" height="95" rx="12" fill="#fff" stroke="#bae6fd"/><text class="bt" x="1351" y="761" text-anchor="middle">Accountability</text><text class="small" x="1351" y="786" text-anchor="middle">audit trails, histories</text><text class="small" x="1351" y="806" text-anchor="middle">and exportable reports</text>
+  </g>
+
+  <!-- Governance -->
+  <g filter="url(#shadow)"><rect x="70" y="886" width="1445" height="52" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/></g>
+  <text class="bt" x="155" y="918">Governance across all modules:</text><text class="t" x="445" y="918">role-based access • authentication • audit logging • explicit location consent • privacy notice • secure configuration</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M385 380H430"/><text class="small" x="407" y="367" text-anchor="middle">capture</text>
+  <path class="arrow" d="M795 335H835"/><path class="arrow" d="M835 425H795"/>
+  <text class="small" x="815" y="322" text-anchor="middle">read / write</text>
+  <path class="arrow" d="M1150 262H1190"/><text class="small" x="1170" y="249" text-anchor="middle">risk data</text>
+  <path class="arrow" d="M1150 497H1190"/><text class="small" x="1170" y="484" text-anchor="middle">check-ins</text>
+  <path class="arrow" d="M1353 365V385"/><path class="arrow" d="M1353 600V705"/>
+  <path class="arrow" d="M612 600V680H505V705"/><path class="arrow" d="M992 600V680H1069V705"/>
+  <path class="arrow dashed" d="M1351 855V872H223V855"/><text class="small" x="787" y="875" text-anchor="middle">feedback: reports and actions update asset, maintenance and allocation records</text>
+</svg>

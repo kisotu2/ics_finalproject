@@ -1,0 +1,868 @@
+=== PAGE 1 ===
+Machine Learning Enabled Smart Asset Management System for Predictive Maintenance
+and Asset Lifecycle Management
+[Internal Project]
+Kisotu Samwel Lemayian
+152170
+ICS 4B
+Supervisor Name
+Mr. Kevin Ouma
+An Informatics and Computer Science Project Proposal Submitted to The School of
+Computing and Engineering Sciences in Partial Fulfilment of the Requirements for the
+Award of a Bachelor of Science in Informatics and Computer Science
+School of Computing and Engineering Sciences
+Strathmore University
+Nairobi, Kenya
+June 2026
+
+=== PAGE 2 ===
+Declaration and Approval
+I declare that this work has not been previously submitted and approved for the award of a degree
+by this or any other University. To the best of my knowledge and belief, the research proposal
+contains no material previously published or written by another person except where due reference
+is made in the research proposal itself.
+Student Name: Kisotu Samwel Lemayian
+Admission Number: 152170
+Student Signature: ______________________ Date: _____15/06/2026________
+The Documentation of Kisotu Samwel Lemayian has been reviewed and approved by Mr. Kevin
+Ouma
+Supervisor Signature: Date: 11 - 06 - 2026
+ii
+
+=== PAGE 3 ===
+Abstract
+The Smart Asset Management System is a web-based solution designed to improve the
+management of ICT assets such as laptops, desktop computers, printers, and other technological
+equipment within an organisation. Many institutions still rely on manual methods, including
+spreadsheets and paper records, which can make asset tracking difficult and increase the risk of
+loss, mismanagement and inaccurate recordkeeping. The proposed system seeks to address these
+challenges by providing a centralised platform for recording, monitoring and managing assets
+throughout their lifecycle.
+The system will be developed using PHP, MySQL, HTML, CSS, JavaScript and XAMPP. It will
+support key functions such as asset registration, assignment tracking, user and role management,
+status monitoring and report generation.
+To enhance security, the system will implement Two-Factor Authentication (2FA) through email
+verification using PHPMailer. Additionally, will also introduce machine learning features to make
+the system more intelligent. These features will support predictive maintenance, smart asset
+allocation, asset lifecycle prediction, anomaly detection and automated alerts. By analysing
+information such as device age, repair history, warranty status, usage patterns and assignment
+records, the system will help administrators identify high-risk assets and make better decisions
+before problems become serious.
+Overall, the Smart Asset Management System aims to improve accountability, reduce asset loss,
+support timely maintenance, strengthen security and simplify the day-to-day management of ICT
+resources within an organisation.
+Keywords: Smart Asset Management System, ICT Asset Management, Asset Tracking,
+Predictive Maintenance, Machine Learning, Asset Lifecycle Management, Two-Factor
+Authentication (2FA), Anomaly Detection, Asset Allocation, Report Generation, PHP, MySQL.
+ii i
+
+=== PAGE 4 ===
+Table of Contents
+Declaration and Approval ............................................................................................................... ii
+Abstract .......................................................................................................................................... iii
+List of Figures ............................................................................................................................... vii
+List of Tables ............................................................................................................................... viii
+List of Abbreviations ..................................................................................................................... ix
+Chapter 1: Introduction ............................................................................................................. 1
+1.1 Background Information ................................................................................................. 1
+1.2 Problem Statement .......................................................................................................... 2
+1.3 Research Objectives ........................................................................................................ 2
+1.3.1 General Objective ................................................................................................... 2
+1.3.2 Specific Objectives ................................................................................................. 2
+1.4 Research Questions ......................................................................................................... 3
+1.5 Justification ..................................................................................................................... 3
+1.6 Scope ............................................................................................................................... 4
+1.7 Limitations and Delimitations ......................................................................................... 5
+1.7.1 Limitations .............................................................................................................. 5
+1.7.2 Delimitations ........................................................................................................... 5
+Chapter 2: Literature Review .................................................................................................... 7
+2.1 Introduction ..................................................................................................................... 7
+2.2 Current State of ICT Asset Management ........................................................................ 7
+2.3 Challenges in ICT Asset Management ........................................................................... 7
+2.4 Related Applications, Solutions and Machine Learning Applications ........................... 8
+2.4.1 Spreadsheet-Based Asset Tracking ......................................................................... 8
+2.4.2 Snipe-IT .................................................................................................................. 8
+iv
+
+=== PAGE 5 ===
+2.4.3 GLPI ........................................................................................................................ 9
+2.4.4 Machine Learning in Predictive Maintenance (Solution) ..................................... 11
+2.4.5 Machine Learning in Anomaly Detection and Security (Solution) ...................... 12
+2.4.6 API-based Integration of Web Systems and Machine Learning Models (Solution)
+12
+2.5 Gaps in Existing Applications, Solutions and ML Implementations ............................ 12
+2.6 Conceptual Framework ................................................................................................. 13
+2.6.1 Inputs..................................................................................................................... 14
+2.6.2 Core Application Processes .................................................................................. 14
+2.6.3 Machine Learning Processing ............................................................................... 14
+2.6.4 Flask API Integration ............................................................................................ 14
+2.6.5 Outputs .................................................................................................................. 14
+2.7 Chapter Summary ......................................................................................................... 15
+Chapter 3: Development Methodology .................................................................................. 16
+3.1 Introduction ................................................................................................................... 16
+3.2 Research Paradigm ........................................................................................................ 16
+3.2.1 Data Acquisition ................................................................................................... 16
+3.2.2 Data Processing ..................................................................................................... 16
+3.2.3 Model Training ..................................................................................................... 16
+3.2.4 Model Validation and Testing .............................................................................. 17
+3.3 System Development Methodology .............................................................................. 17
+3.3.1 Justification ........................................................................................................... 17
+3.4 Methodology Diagram .................................................................................................. 18
+3.4.1 Product Backlog .................................................................................................... 18
+3.4.2 Sprint Planning ..................................................................................................... 19
+v
+
+=== PAGE 6 ===
+3.4.3 Sprint Backlog ...................................................................................................... 19
+3.4.4 Sprint Execution .................................................................................................... 19
+3.4.5 Progress Review .................................................................................................... 20
+3.4.6 Sprint Review ........................................................................................................ 20
+3.4.7 Sprint Retrospective .............................................................................................. 20
+3.4.8 Integrated Increment ............................................................................................. 20
+3.5 Deliverables .................................................................................................................. 20
+3.5.1 System Documentation ......................................................................................... 20
+3.5.2 Authentication Module ......................................................................................... 20
+3.5.3 User and Role Management Module .................................................................... 21
+3.5.4 Asset Management Module .................................................................................. 21
+3.5.5 Smart Analytics and Alerts Module ...................................................................... 21
+3.6 Tools and Techniques ................................................................................................... 21
+3.6.1 PHP ....................................................................................................................... 21
+3.6.2 MySQL ................................................................................................................. 21
+3.6.3 HTML, CSS and JavaScript .................................................................................. 21
+3.6.4 XAMPP ................................................................................................................. 21
+3.6.5 PHPMailer............................................................................................................. 21
+3.6.6 Machine Learning Techniques .............................................................................. 21
+References ..................................................................................................................................... 23
+Appendices .................................................................................................................................... 26
+Appendix 1: Gantt Chart ........................................................................................................... 26
+Appendix 2: Turnitin Report ..................................................................................................... 27
+v i
+
+=== PAGE 7 ===
+List of Figures
+Figure 1: Conceptual Framework of Smart Asset Management System ...................................... 15
+Figure 2: Scrum for One Framework ............................................................................................ 18
+vi i
+
+=== PAGE 8 ===
+List of Tables
+Table 1: Comparison of Existing Asset Management Solutions and the Proposed Smart Asset
+Management System ..................................................................................................................... 11
+vi i i
+
+=== PAGE 9 ===
+List of Abbreviations
+API – Application Programming Interface
+CSS – Cascading Style Sheets
+ERD – Entity Relationship Diagram
+GLPI – Gestionnaire Libre de Parc Informatique
+HTML – Hypertext Markup Language
+ICT – Information and Communication Technology
+ISO – International Organisation for Standardisation
+IT – Information Technology
+ML – Machine Learning
+MySQL – My Structure Query Language
+NumPy – Numerical Python
+PHP – Hypertext Processor
+PHPMailer – PHP Mailer
+XAMPP – Cross-Platform, Apache, MariaDB
+ix
+
+=== PAGE 10 ===
+Chapter 1: Introduction
+1.1 Background Information
+Organisations today depend heavily on ICT assets such as laptops, desktop computers, printers,
+networking devices, and related equipment to support daily operations (Weill & Ross, 2004). As
+these assets increase in number, managing them through manual records becomes more difficult.
+Administrators must keep track of who has each device, where it is located, its condition, its
+maintenance history, and whether it is still useful to the organisation.
+In many institutions, asset records are still maintained using spreadsheets, paper files, or isolated
+systems that do not communicate effectively, resulting in inefficiencies and data inconsistencies
+(ISO/IEC 19770-1, 2017). While these methods may work when the number of assets is small,
+they become unreliable as the organisation grows. Records can become outdated, devices can be
+misplaced, and it may take a long time to identify which assets need repair, replacement, or
+reassignment.
+Manual asset management also creates accountability challenges. When device assignment records
+are incomplete or inaccurate, it becomes hard to know who is responsible for a particular asset.
+This can lead to asset loss, unauthorised use, delayed maintenance, and poor use of organisational
+resources. Administrators may also spend too much time physically checking devices and updating
+records instead of focusing on more strategic ICT support tasks.
+A centralised web-based asset management system can address many of these challenges by
+providing a single platform for recording, updating, securing, and monitoring asset information.
+Such a system improves visibility, reduces duplication, and makes it easier for administrators to
+generate reports and make timely decisions.
+This project goes beyond basic asset tracking by introducing machine learning features into the
+proposed system. Machine learning techniques have increasingly been applied to predict
+equipment failures, optimise maintenance schedules, and support resource allocation decisions
+(Carvalho et al., 2019), detect unusual activity, estimate asset lifecycle stages, and generate alerts
+for issues such as warranty expiry, maintenance needs, or suspicious access attempts. In this way,
+the system will support both operational efficiency and proactive decision-making.
+1
+
+=== PAGE 11 ===
+1.2 Problem Statement
+Organisations are expected to manage ICT assets in ways that promote accountability, continuity
+of operations, and effective use of resources. Ideally, an asset management system should provide
+accurate asset tracking, secure device assignment to users, real-time status monitoring,
+maintenance scheduling, lifecycle visibility, and reliable reporting.
+However, many organisations still rely on manual or semi-digital methods such as spreadsheets,
+paper-based records, and disconnected tools. These methods are prone to human error and do not
+provide real-time visibility into asset location, condition, assignment, or maintenance needs. As a
+result, organisations may experience asset loss, delayed repairs, inaccurate records, poor
+accountability and unauthorised use of ICT equipment.
+Existing asset management approaches also tend to lack intelligent automation. They may record
+asset information, but they often do not help administrators predict which devices are likely to fail,
+which assets are approaching the end of their useful life, or which user activities appear suspicious.
+This limits the organisation's ability to act early and make data-driven decisions.
+This project, therefore, seeks to develop a Smart Asset Management System that automates asset
+tracking and management while integrating machine learning capabilities for predictive
+maintenance, smart asset allocation, anomaly detection, lifecycle prediction, and automated alerts.
+1.3 Research Objectives
+The objectives focus on developing a secure, web-based asset management system that improves
+ICT asset tracking, accountability, maintenance planning and decision-making with the help of
+machine learning.
+1.3.1 General Objective
+To design and develop a secure web-based Smart Asset Management System that enables
+organisations to register, assign, track, monitor, and manage ICT assets while applying machine
+learning techniques to support predictive maintenance, smart asset allocation, anomaly detection,
+and asset lifecycle management.
+1.3.2 Specific Objectives
+i. To analyse the current state of ICT asset management in organisations
+2
+
+=== PAGE 12 ===
+ii. To study and review existing asset management systems and related machine learning
+implementations
+iii. To identify the gaps and challenges in existing ICT asset management
+iv. To design and develop a web-based Smart Asset Management System for ICT assets
+v. To integrate security features such as two-factor authentication and role-based access
+control
+vi. To apply machine learning techniques for predictive maintenance, asset lifecycle
+prediction, smart allocation, and anomaly detection
+vii. To test and validate the proposed Smart Asset Management System
+1.4 Research Questions
+The study will be guided by the following research questions:
+i. What is the current state of ICT asset management in organisations?
+ii. What challenges are commonly experienced in manual or semi-digital ICT asset
+management processes?
+iii. How have existing asset management systems addressed the challenges of ICT asset
+tracking and accountability?
+iv. What gaps exist in current asset management systems and machine learning
+implementations?
+v. How can a web-based Smart Asset Management System improve the management of ICT
+assets?
+vi. How can machine learning be used to support predictive maintenance and asset lifecycle
+management?
+vii. How effective is the proposed system in improving asset tracking, security, and
+administrative decision-making?
+1.5 Justification
+ICT assets are important resources in every modern organisation. Laptops, desktops, printers, and
+other digital devices support communication, teaching, administration, research, business
+operations, and service delivery. Because these assets are valuable and essential to daily
+operations, they must be properly tracked, assigned, maintained, and secured.
+3
+
+=== PAGE 13 ===
+Many organisations still rely on manual records, spreadsheets, or disconnected systems to manage
+ICT assets. While these approaches may be adequate for small inventories, they become
+increasingly difficult to manage as the number of assets grows. This often results in inaccurate
+records, difficulties tracking asset assignments, delayed maintenance, and reduced visibility into
+asset usage and condition.
+Existing asset management systems have improved asset tracking and reporting; however, many
+primarily focus on record keeping and lack intelligent capabilities that support proactive decision-
+making. Features such as predictive maintenance, anomaly detection, asset lifecycle forecasting,
+and intelligent asset allocation are often absent. Additionally, some systems provide limited
+security controls, increasing the risk of unauthorised access and data manipulation.
+This study is justified because it proposes a Smart Asset Management System that integrates
+traditional asset management functions with machine learning and enhanced security features. The
+system will enable administrators to register and monitor assets, manage user assignments,
+generate reports, and oversee asset status through a centralised platform. Intelligent modules will
+support predictive maintenance, asset lifecycle prediction, anomaly detection, and optimised asset
+allocation, while security mechanisms such as two-factor authentication will help protect sensitive
+information.
+The proposed system will improve operational efficiency, support informed decision-making,
+strengthen asset accountability, and reduce costs associated with equipment failure and poor
+resource utilisation. From an academic perspective, the study contributes to the field of information
+systems by demonstrating how machine learning techniques can be applied to ICT asset
+management to support proactive and data-driven management practices.
+In summary, the research aims to provide organisations with a secure, centralised, and intelligent
+solution for managing ICT assets while contributing to the advancement of smart information
+systems and machine-learning-enabled asset management.
+1.6 Scope
+This study focuses on the design and development of a web-based Smart Asset Management
+System for managing ICT assets within an organisation, including laptops, desktops, printers, and
+other related computing devices. The system will provide a centralised platform for asset
+4
+
+=== PAGE 14 ===
+registration, assignment, tracking, monitoring, reporting, user management, and secure
+authentication. It will incorporate intelligent features such as predictive maintenance, asset
+lifecycle prediction, anomaly detection, and smart asset allocation to support informed decision-
+making. The system will manage asset-related data, including asset details, condition, maintenance
+history, warranty information, assignment records, and user activities, using sample data where
+real organisational data is unavailable. The project will be completed within the approved
+academic period, covering requirements analysis, system design and development, testing,
+evaluation, documentation, and final submission. The study is limited to ICT assets and excludes
+non-ICT resources such as furniture, vehicles, and building infrastructure, as well as procurement
+management, asset depreciation, barcode scanner hardware integration, enterprise resource
+planning functions, and advanced hardware repair diagnostics.
+1.7 Limitations and Delimitations
+1.7.1 Limitations
+These are the challenges that may affect the study but are beyond the researcher's full control. This
+study may face the following limitations:
+i. Limited availability of real historical asset data – The study may rely on synthetic or limited
+datasets, which could affect the generalizability of machine learning models.
+ii. Dependence on data quality – The accuracy of predictions and alerts depends heavily on
+the completeness and correctness of input data.
+iii. Local development environment – The system will be developed and tested in a local
+environment (e.g., XAMPP), which may not fully replicate real-world deployment
+conditions.
+iv. Email dependency for two-factor authentication – 2FA effectiveness relies on reliable
+email delivery and user access to their email accounts.
+v. Limited machine learning accuracy during early testing – Initial predictions may not be
+highly accurate until the models are trained with sufficient real-world data over time.
+1.7.2 Delimitations
+These are the boundaries intentionally set by the researcher to keep the study focused and
+manageable. The study will have the following delimitations:
+5
+
+=== PAGE 15 ===
+i. The study will focus only on ICT assets – Other organisational assets such as furniture,
+vehicles, or building equipment are excluded.
+ii. The system will focus on administrative users – The primary users are ICT administrators
+and department heads, not all employees.
+iii. The project will focus on core asset management functions – Advanced features such as
+automated procurement or vendor management are not included.
+iv. The machine learning component will focus on selected prediction tasks – Only predictive
+maintenance, lifecycle prediction, anomaly detection, and smart allocation will be
+implemented.
+v. The system will be developed for demonstration and academic evaluation – It is not
+initially intended for immediate commercial deployment.
+In summary, the delimitations help keep the project focused on solving a specific ICT asset
+management problem, while the limitations acknowledge the practical challenges that may affect
+the study. Together, they make the research more realistic, transparent, and credible.
+6
+
+=== PAGE 16 ===
+Chapter 2: Literature Review
+2.1 Introduction
+This chapter concludes with a review of literature on ICT asset management, existing asset
+management systems, and the use of machine learning in monitoring assets, asset maintenance
+prediction, security, and decision-making. This will be useful to understand the existing
+knowledge, the gaps in existing approaches, and how the proposed Smart Asset Management
+System would address the gaps.
+It first analyses the status of the current state of the field of ICT asset management in 2.2, discusses
+the challenges found in existing ICT asset management systems in 2.3, discusses a combination of
+the proposed systems and the machine learning implementation in 2.4 and concludes with a
+conceptual Framework showing the combination of PHP and MySQL web application with
+Python-based machine learning models through a Flask API.
+2.2 Current State of ICT Asset Management
+ICT asset management is a process of identifying, assigning, monitoring, maintaining and retiring
+technology assets within an organisation.
+Many organisations are still handling their ICT assets manually with records, spreadsheets and
+disjointed digital tools. These are well-known techniques and can be readily applied, but they are
+ineffective when dealing with many assets. Records can be duplicated, assets not updated when it
+needs to be, admin may be unable to verify if a device is active, faulty, assigned, unassigned, under
+repair or retired.
+The ICT asset management landscape today reveals a need for a unified system with the ability to
+offer real-time visibility and accountability. This will help minimise the chance of losing asset
+records and reports and simplify device ownership tracking and planning maintenance. But most
+of the current systems are primarily designed to store and retrieve information and not solve future
+problems or to aid intelligent decision-making.
+2.3 Challenges in ICT Asset Management
+Organisations face several challenges when ICT assets are managed manually or through weak
+digital processes. One of the main challenges is inaccurate record-keeping. When administrators
+7
+
+=== PAGE 17 ===
+rely on spreadsheets or paper records, it is easy for asset details to become outdated, incomplete,
+or inconsistent. This can lead to confusion about asset ownership, location and condition.
+Another challenge is poor accountability. If an asset is assigned to a user but the assignment is not
+properly recorded, it becomes difficult to determine who is responsible when the device is lost,
+damaged or returned in poor condition. This can increase asset misuse and reduce trust in the asset
+management process.
+Maintenance is also a common problem, since most organisations respond only after a device has
+failed. This reactive approach increases downtime and may lead to higher repair costs. Without
+maintenance history and predictive alerts, administrators may not know which assets are likely to
+fail soon or which devices are approaching the end of their useful life.
+Security is another concern in the system. The asset management system contains sensitive data
+about users, devices, departments and assignments. If access is not properly controlled,
+unauthorised users may view, change or delete important records. For this reason, secure
+authentication, role-based access control and activity monitoring are important parts of a reliable
+asset management system.
+2.4 Related Applications, Solutions and Machine Learning Applications
+2.4.1 Spreadsheet-Based Asset Tracking
+Spreadsheets are frequently used to track assets as they are easy, inexpensive and familiar to most
+people. They can hold asset name, serial number, user assigned, purchase date and status data. At
+the start, in small organisations, spreadsheets might suffice.
+However, there are some disadvantages to asset tracking using a spreadsheet. It offers little access
+control, automated alerts, real-time updates, or audit trails. Spreadsheets can be incorrectly copied,
+edited or shared with unauthorised users. The more assets, the greater the difficulty in managing
+this approach and the likelihood of errors.
+2.4.2 Snipe-IT
+Snipe-IT is an open-source asset management system that can be used to track hardware, licenses,
+check-in and check-out, users and reporting. This is helpful for organisations that require a formal
+8
+
+=== PAGE 18 ===
+method to handle assets and boost accountability. It benefits from asset records in a single place,
+audit assistance and easy assignment history.
+It has assets and administrative reporting as its primary features, but it's not a complete system for
+all things. It does not offer out-of-the-box machine learning capabilities for predictive
+maintenance, intelligent asset allocation, anomaly detection or lifecycle prediction. This provides
+a chance to build a system which integrates regular asset management with intelligent prediction
+and decision support.
+2.4.3 GLPI
+GLPI is an IT service management and asset management platform which supports IT resource
+tracking, ticketing, helpdesk functions and inventory management. It is appropriate for companies
+that require troubleshooting with users and managing IT assets from a single place.
+While GLPI offers numerous valuable capabilities, it can be more intricate than required for
+organisations that require only targeted ICT asset management. It could also need further setup or
+integration to accommodate predictions based on machine learning. The goal of this project is to
+develop a more targeted system that takes the link between asset management and predictive
+analytics one step further.
+Table 1 compares the features of spreadsheet-based asset tracking, Snipe-IT, GLPI, and the
+proposed Smart Asset Management System, highlighting the additional machine learning,
+security, and decision-support capabilities offered by the proposed solution.
+Feature Spreadsheet- Snipe-IT GLPI Proposed Smart
+Based Tracking Asset
+Management
+System
+Asset
+✓ ✓ ✓ ✓
+Registration
+9
+
+=== PAGE 19 ===
+Asset Limited
+✓ ✓ ✓
+Assignment
+Tracking
+Asset Status Limited
+✓ ✓ ✓
+Monitoring
+Centralised
+✗ ✓ ✓ ✓
+Asset Database
+User
+✗ ✓ ✓ ✓
+Management
+Role-Based
+✗ ✓ ✓ ✓
+Access Control
+Two-Factor Limited to Limited to
+✗ ✓
+Authentication external setup External setup
+Maintenance
+✗ ✓ ✓ ✓
+History
+Management
+Automated Limited
+✗ ✓ ✓
+Alerts
+Report Limited
+✓ ✓ ✓
+Generation
+Audit Trail
+✗ ✓ ✓ ✓
+Real-Time
+✗ ✓ ✓ ✓
+Asset Visibility
+Predictive
+✗ ✗ ✗ ✓
+Maintenance
+10
+
+=== PAGE 20 ===
+Asset Lifecycle
+✗ ✗ ✗ ✓
+Prediction
+Smart Asset
+✗ ✗ ✗ ✓
+Allocation
+Anomaly
+✗ ✗ ✗ ✓
+Detection
+Machine
+✗ ✗ ✗ ✓
+Learning
+Integration
+Flask API
+✗ ✗ ✗ ✓
+Integration
+Decision Limited Limited
+✗ ✓
+Support
+Analysis
+Focused ICT Limited
+✓ ✗ ✓
+Asset
+Management
+Ease of Use for Limited
+✓ ✓ ✓
+Small
+Organisations
+Table 1: Comparison of Existing Asset Management Solutions and the Proposed Smart Asset Management System
+2.4.4 Machine Learning in Predictive Maintenance (Solution)
+Machine learning has proven to be of great value in maintenance, as it can detect trends in historical
+data and use that data to make forecasts. Machine learning can use these data assets: age, repair
+frequency, asset warranty status, asset assignment duration, and history of asset faults, to determine
+if an asset is likely to need maintenance soon.
+11
+
+=== PAGE 21 ===
+Predictive maintenance becomes crucial because it paves the way for organisations to shift from
+reactive to proactive maintenance. Rather than waiting for a device to fail, an administrator can be
+alerted to the failure and make plans to repair or replace the device before it disrupts operations.
+This can help minimise downtime, boost productivity, and cut down on unexpected repair
+expenses.
+2.4.5 Machine Learning in Anomaly Detection and Security (Solution)
+Machine learning can also be used in security to identify what is considered unusual in the
+behaviour or actions of the users or in the assets. For instance, repeated unsuccessful login
+attempts, unusual login time, unexpected changes in asset status, or unusual assignment activity
+may be flagged. Warning messages can assist administrators in acting in time before malicious
+activities inflict serious harm.
+Anomaly detection will be used in this study to aid the security component of the Smart Asset
+Management System. It will not supplant regular authentication controls; it will reinforce the
+normal controls by detecting activities that seem irregular and unique to normal system activities.
+2.4.6 API-based Integration of Web Systems and Machine Learning Models (Solution)
+In modern systems, the web application and machine learning systems are frequently separated.
+This way, the system is easier to maintain; the web app can maintain user interfaces, records,
+authentication, and reports; the machine learning service can do the predictions and analytics.
+The proposed system will involve the PHP and MySQL application to handle the major roles in
+asset management and the machine learning models will be created by utilising the Python libraries
+like scikit-learn, Pandas, and NumPy. The two parts of the system will be linked together by a
+Flask API. The PHP application will submit details of the asset being monitored to the Flask API,
+which will respond with predictions and/or alerts that will be displayed to the administrator in real-
+time.
+2.5 Gaps in Existing Applications, Solutions and ML Implementations
+Looking at the tools and approaches currently available, a few clear gaps stand out that are worth
+addressing.
+For starters, most asset management tools are built around recording and tracking they help you
+stay organised and keep inventory in check, but they don't do much to help you think ahead.
+12
+
+=== PAGE 22 ===
+Administrators are often left manually combining data to figure out when something needs
+maintenance or replacement, which is time-consuming and leaves a lot of room for error (Laudon
+& Laudon, 2022; ISO 55000, 2014).
+On top of that, many of the more capable solutions on the market are built for a different audience.
+They come loaded with enterprise-grade IT service management features that, while impressive,
+can feel overwhelming for smaller organisations that just need something straightforward and easy
+to use (Alemzadeh et al., 2018).
+There's also a noticeable absence of smarter functionality in most conventional systems. Things
+like predictive maintenance, intelligent asset allocation, anomaly detection, and lifecycle
+forecasting rarely come built in. When they do exist, they typically require separate tools, custom
+configurations, or third-party platforms all of which add complexity and cost to an already
+involved process (Aggarwal, 2015; Géron, 2022).
+Finally, security doesn't always get the attention it deserves. Systems that hold asset and user data
+need robust protections things like strong authentication and role-based access controls. Without
+them, the door is left open for unauthorised access or accidental tampering with records (Stallings,
+2018; NIST, 2020).
+Taken together, these gaps make a compelling case for a Smart Asset Management System one
+that's secure, focused, and genuinely easy to work with, while bringing modern machine learning
+capabilities into the mix. The proposed system aims to do exactly that, bringing asset registration,
+assignment, tracking, user management, Two-Factor Authentication (2FA), predictive analytics,
+and automated alerts together under one roof (Géron, 2022; Laudon & Laudon, 2022).
+2.6 Conceptual Framework
+The conceptual framework for this study explains how the proposed Smart Asset Management
+System will work. The framework is based on five main parts: inputs, core application processes,
+machine learning processing, API integration and outputs, as shown in Figure 1: Conceptual
+Framework of Smart Asset Management
+13
+
+=== PAGE 23 ===
+2.6.1 Inputs
+The main inputs will include asset details, user details, department information, assignment
+records, asset status, maintenance history, warranty information, and system activity logs. These
+inputs will provide the data needed for both normal asset management and machine learning
+analysis.
+2.6.2 Core Application Processes
+The PHP and MySQL-based web application will handle the main system processes. These include
+user login, Two-Factor Authentication, role-based access control, asset registration, asset
+assignment, status updates, report generation, and alert display. This layer will ensure that
+administrators can manage ICT assets in a centralised and secure way.
+2.6.3 Machine Learning Processing
+The machine learning component will be developed using Python libraries such as Scikit-learn,
+Pandas, and NumPy. Pandas and NumPy will support data preparation and analysis, while Scikit-
+learn will support model development. The models will analyse asset data to support predictive
+maintenance, asset lifecycle prediction, smart allocation, and anomaly detection.
+2.6.4 Flask API Integration
+The Flask API will act as the communication bridge between the PHP web application and the
+Python machine learning models. When the system needs a prediction, the PHP application will
+send relevant data to the Flask API. The API will process the request using the trained machine
+learning model and return the result to the web application.
+2.6.5 Outputs
+The expected outputs will include accurate asset records, assignment reports, maintenance alerts,
+lifecycle predictions, anomaly notifications, and decision-support reports. These outputs will help
+administrators manage assets more efficiently, improve accountability, reduce downtime, and
+make better decisions about maintenance and replacement.
+14
+
+=== PAGE 24 ===
+Figure 1 : Conceptual Framework of Smart Asset Management System
+2.7 Chapter Summary
+This chapter has reviewed the current state of ICT asset management, common challenges, existing
+solutions, machine learning applications, and the gaps that remain. The review shows that
+organisations need more than a basic asset register. They need systems that are secure, centralised,
+intelligent, and capable of supporting proactive decisions. The proposed Smart Asset Management
+System responds to this need by combining a PHP and MySQL asset management platform with
+Python-based machine learning models connected through a Flask API.
+15
+
+=== PAGE 25 ===
+Chapter 3: Development Methodology
+3.1 Introduction
+This chapter explains the approach that will be used to design, develop, test, and evaluate the Smart
+Asset Management System. It covers the research paradigm, data-related activities for the machine
+learning component, the software development approach, system analysis and design,
+development tools, and expected system deliverables.
+3.2 Research Paradigm
+The project will use an applied design science approach because it aims to solve a practical
+organisational problem through the development of a working software artefact. The research will
+focus on understanding asset management challenges, designing a suitable system, implementing
+the solution, and evaluating whether the system addresses the identified problem.
+For the machine learning component, the project will also use a data-driven approach. Historical
+and operational asset data will be analysed to support prediction, classification, and anomaly
+detection tasks.
+3.2.1 Data Acquisition
+Data will be collected from asset records, user assignment records, maintenance history, warranty
+information, asset status updates, and login or system activity logs. Where real organisational data
+is not available, realistic sample data will be prepared for development and testing purposes
+(Laudon & Laudon, 2022).
+3.2.2 Data Processing
+The collected data will be cleaned, validated, and organised before being used by the system. This
+will include removing duplicate records, handling missing values, standardising fields such as
+asset status and department names, and preparing useful features such as device age, number of
+repairs, warranty status, and assignment duration.
+3.2.3 Model Training
+Machine learning models will be trained to support predictive maintenance, lifecycle prediction,
+and anomaly detection. The models may use features such as asset age, repair frequency, usage
+period, status history, warranty status, and login behaviour. The most suitable model will be
+selected based on the type and quality of the available data.
+16
+
+=== PAGE 26 ===
+3.2.4 Model Validation and Testing
+The trained models will be tested using separate validation data to evaluate their performance. The
+project will consider measures such as accuracy, precision, recall, and error rate, depending on the
+model task. The results will help determine whether the models provide useful support for
+administrators.
+3.3 System Development Methodology
+This project adopts the Object-Oriented Analysis and Design (OOAD) paradigm to guide the
+analysis, design, and implementation of the Smart Asset Management System. OOAD is
+appropriate because the system consists of several independent but interconnected modules,
+including Authentication and Security, User Management, Asset Registration, Asset Assignment
+and Tracking, Reporting and Analytics, Alert Management, and Machine Learning-Based
+Predictive Analytics. Each module can be modelled as an independent object with defined
+attributes, methods, and responsibilities, promoting modularity, maintainability, and scalability.
+To support iterative development, the project adopts the Agile Software Development
+Methodology using the Scrum for One framework. Since the project is developed by a single
+developer, Scrum for One provides a structured approach in which the developer assumes the
+responsibilities of Product Owner, Scrum Master, and Developer. The methodology divides
+development into short sprints, with each sprint producing a functional increment of the system.
+This enables continuous testing, feedback, and refinement throughout the development lifecycle.
+3.3.1 Justification
+Three key factors justify the selection of OOAD with Scrum for One for this project.
+First, the Smart Asset Management System consists of multiple interconnected modules that must
+function independently while sharing data and services. OOAD supports modular development by
+allowing each component to be designed, implemented, and tested separately before integration.
+Second, the project incorporates machine learning features such as predictive maintenance, asset
+lifecycle prediction, anomaly detection, and smart asset allocation. The performance of these
+models may require continuous experimentation, tuning, and refinement based on available asset
+data. Agile development supports such evolving requirements through iterative development
+cycles.
+17
+
+=== PAGE 27 ===
+Third, Scrum for One provides a structured mechanism for planning, development, testing, and
+evaluation while maintaining flexibility. This is particularly important because system
+requirements and machine learning model performance may change as development progresses.
+The use of Git and GitHub further supports version control, traceability, and reproducibility
+throughout the project.
+Traditional methodologies such as the Waterfall Model would be less suitable because they require
+requirements to be fully defined before implementation begins. Since this project incorporates
+predictive analytics and machine learning components that may require continuous improvement,
+an iterative Agile approach is more appropriate.
+3.4 Methodology Diagram
+The Scrum for One methodology adopted for this project follows an iterative cycle consisting of
+Product Backlog, Sprint Planning, Sprint Backlog, Sprint Execution, Progress Review, Sprint
+Review, Sprint Retrospective, and Integrated Increment. Each sprint produces a working version
+of the Smart Asset Management System with additional functionality.
+Figure 2: Scrum for One Framework
+3.4.1 Product Backlog
+The product backlog contains all system requirements and development tasks identified for the
+Smart Asset Management System. These include:
+18
+
+=== PAGE 28 ===
+i. Database design and implementation
+ii. User authentication and authorization
+iii. Two-Factor Authentication (2FA) integration
+iv. Asset registration and inventory management
+v. Asset assignment and tracking
+vi. Reporting and dashboard development
+vii. Alert and notification functionality
+viii. Machine learning model development
+ix. Predictive maintenance implementation
+x. Asset lifecycle prediction
+xi. Anomaly detection
+xii. System testing and evaluation
+The backlog is continuously refined and prioritised according to project objectives and technical
+dependencies.
+3.4.2 Sprint Planning
+Sprint planning is conducted at the beginning of each development cycle. During this phase, the
+developer selects backlog items to be completed within the sprint and estimates the effort required.
+Early sprints focus on database development, authentication, and core asset management
+functionalities, while later sprints focus on machine learning integration, reporting, and system
+evaluation.
+3.4.3 Sprint Backlog
+The sprint backlog contains the specific tasks selected for implementation during a particular
+sprint. Examples include creating database tables, implementing user authentication, developing
+asset tracking interfaces, training predictive maintenance models, or configuring email-based
+alerts.
+3.4.4 Sprint Execution
+During sprint execution, selected tasks are developed, tested, and integrated into the evolving
+system. Development follows the OOAD structure, ensuring that each module is implemented and
+tested independently before integration. All source code is managed using Git and GitHub.
+19
+
+=== PAGE 29 ===
+3.4.5 Progress Review
+Regular self-reviews are conducted throughout the sprint to monitor progress and identify
+challenges. Issues such as database design conflicts, machine learning model performance
+limitations, or system integration challenges are addressed promptly to ensure continuous
+development progress.
+3.4.6 Sprint Review
+At the end of each sprint, the completed system increment is reviewed against the sprint objectives.
+Examples of completed increments include a functional authentication module, a working asset
+registration system, a predictive maintenance model, or a reporting dashboard. Feedback obtained
+during this review guides future development activities.
+3.4.7 Sprint Retrospective
+The sprint retrospective evaluates the effectiveness of the development process and identifies areas
+for improvement. Lessons learned during implementation, testing, and integration are documented
+and applied in subsequent sprints to improve productivity and system quality.
+3.4.8 Integrated Increment
+The integrated increment represents the working version of the Smart Asset Management System
+produced at the end of each sprint. The final integrated increment combines user authentication,
+role management, asset registration, assignment tracking, reporting, alert generation, predictive
+maintenance, asset lifecycle prediction, anomaly detection, and dashboard visualisation into a
+complete intelligent asset management platform.
+3.5 Deliverables
+3.5.1 System Documentation
+The project will deliver system documentation that explains the requirements, design, database
+structure, implementation approach, testing process, and user guidance.
+3.5.2 Authentication Module
+The authentication module will support secure login, role-based access control, session
+management, and email-based Two-Factor Authentication.
+20
+
+=== PAGE 30 ===
+3.5.3 User and Role Management Module
+This module will allow the Super Administrator to create users, assign roles, update user details,
+and control access privileges.
+3.5.4 Asset Management Module
+This module will support asset registration, editing, categorisation, assignment, status tracking,
+and record validation.
+3.5.5 Smart Analytics and Alerts Module
+This module will provide predictive maintenance alerts, lifecycle predictions, anomaly
+notifications, and reports to support better asset management decisions.
+3.6 Tools and Techniques
+3.6.1 PHP
+PHP will be used to implement the server-side logic of the system, including authentication, data
+processing, form handling, database interaction and business rules.
+3.6.2 MySQL
+MySQL will be used to store asset records, user accounts, roles, assignments, maintenance history,
+alerts and system activity logs.
+3.6.3 HTML, CSS and JavaScript
+HTML will structure the web pages, CSS will style the interfaces, and JavaScript will support
+client-side validation and interactive features.
+3.6.4 XAMPP
+XAMPP will provide the local Apache and MySQL environment needed to develop and test the
+web application.
+3.6.5 PHPMailer
+PHPMailer will be used to send email verification codes for Two-Factor Authentication.
+3.6.6 Machine Learning Techniques
+The project uses two machine learning algorithms to enhance ICT asset management. Random
+Forest, a supervised learning algorithm, is applied to predictive maintenance and asset lifecycle
+forecasting, selected for its strong prediction accuracy, ability to handle multiple asset-related
+21
+
+=== PAGE 31 ===
+variables and flexibility across both classification and regression tasks. Isolation Forest
+complements this by detecting anomalies such as unusual login activity, suspicious asset usage
+patterns and abnormal system behaviour. Together, these algorithms enable the system to
+anticipate maintenance needs, extend asset lifecycles, identify potential security risks and support
+more informed decision-making.
+22
+
+=== PAGE 32 ===
+References
+Aggarwal, C. C. (2015). Data mining: The textbook. Springer.
+Alemzadeh, H., Mylopoulos, J., & Giorgini, P. (2018). Requirements engineering for enterprise
+systems: A review of challenges and approaches. Information Systems, 72, 1–18.
+https://doi.org/10.1016/j.is.2017.08.001
+Alpaydin, E. (2020). Introduction to machine learning (4th ed.). MIT Press.
+Carvalho, T. P., Soares, F. A. A. M. N., Vita, R., Francisco, R. D. P., Basto, J. P., & Alcalá, S. G.
+S. (2019). A systematic literature review of machine learning methods applied to predictive
+maintenance. Computers & Industrial Engineering, 137, Article 106024.
+https://doi.org/10.1016/j.cie.2019.106024
+Géron, A. (2022). Hands-on machine learning with Scikit-Learn, Keras, and TensorFlow (3rd ed.).
+O'Reilly Media.
+GLPI Project. (n.d.). GLPI documentation. Retrieved June 11, 2026, from https://glpi-
+project.org/documentation/
+Han, J., Kamber, M., & Pei, J. (2012). Data mining: Concepts and techniques (3rd ed.). Morgan
+Kaufmann.
+Harris, C. R., Millman, K. J., van der Walt, S. J., Gommers, R., Virtanen, P., Cournapeau, D.,
+Wieser, E., Taylor, J., Berg, S., Smith, N. J., Kern, R., Picus, M., Hoyer, S., van Kerkwijk,
+M. H., Brett, M., Haldane, A., del Rio, J. F., Wiebe, M., Peterson, P., Gerard-Marchant, P.,
+Sheppard, K., Reddy, T., Weckesser, W., Abbasi, H., Gohlke, C., & Oliphant, T. E. (2020).
+Array programming with NumPy. Nature, 585(7825), 357–362.
+https://doi.org/10.1038/s41586-020-2649-2
+International Organization for Standardization. (2014). ISO 55000:2014 asset management—
+Overview, principles and terminology. Author.
+ISO/IEC. (2017). ISO/IEC 19770-1:2017 information technology—IT asset management—Part 1:
+IT asset management systems—Requirements. Author.
+23
+
+=== PAGE 33 ===
+Jardine, A. K. S., Lin, D., & Banjevic, D. (2006). A review on machinery diagnostics and
+prognostics implementing condition-based maintenance. Mechanical Systems and Signal
+Processing, 20(7), 1483–1510. https://doi.org/10.1016/j.ymssp.2005.09.012
+Laudon, K. C., & Laudon, J. P. (2022). Management information systems: Managing the digital
+firm (17th ed.). Pearson.
+Marrone, M., & Kolbe, L. M. (2011). Impact of IT service management frameworks on IT asset
+management. Business & Information Systems Engineering, 3(1), 5–18.
+https://doi.org/10.1007/s12599-010-0131-8
+McKinney, W. (2010). Data structures for statistical computing in Python. In S. van der Walt & J.
+Millman (Eds.), Proceedings of the 9th Python in Science Conference (pp. 56–61).
+National Institute of Standards and Technology. (2020). Digital identity guidelines (Special
+Publication 800-63B). U.S. Department of Commerce.
+https://doi.org/10.6028/NIST.SP.800-63B
+Pallets Projects. (n.d.). Flask documentation. Retrieved June 11, 2026, from
+https://flask.palletsprojects.com/
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M.,
+Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D.,
+Brucher, M., Perrot, M., & Duchesnay, E. (2011). Scikit-learn: Machine learning in
+Python. Journal of Machine Learning Research, 12, 2825–2830.
+Pressman, R. S., & Maxim, B. R. (2020). Software engineering: A practitioner's approach (9th
+ed.). McGraw-Hill Education.
+Snipe-IT. (n.d.). Snipe-IT documentation. Retrieved June 11, 2026, from https://snipeitapp.com/
+Sommerville, I. (2016). Software engineering (10th ed.). Pearson.
+Stallings, W. (2018). Effective cybersecurity: A guide to using best practices and standards.
+Addison-Wesley.
+24
+
+=== PAGE 34 ===
+Weill, P., & Ross, J. W. (2004). IT governance: How top performers manage IT decision rights
+for superior results. Harvard Business School Press.
+25
+
+=== PAGE 35 ===
+Appendices
+Appendix 1: Gantt Chart
+26
+
+=== PAGE 36 ===
+Appendix 2: Turnitin Report
+27

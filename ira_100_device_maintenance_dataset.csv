@@ -1,0 +1,101 @@
+asset_tag,device_type,brand,model,department,assigned_user,location,latitude,longitude,purchase_date,warranty_expiry,repair_count,open_repair_count,maintenance_date,maintenance_issue,repair_cost_kes,maintenance_status,active_hours_30d,crash_count_30d,battery_health_percent,failed_within_90_days
+IRA1000,Laptop,Lenovo,ThinkPad E14 Gen 3,ICT,Peter,Finance Department,-1.286496,36.816669,2021-04-30,2026-07-22,5,3,2026-07-18,Operating system issue,5661.29,Open,679,7,72,1
+IRA1001,Laptop,Lenovo,ThinkPad T14 Gen 2,Finance,John,Corporate Services,-1.286241,36.81762,2023-11-05,2027-07-09,0,0,,No maintenance recorded,0.0,No record,248,3,93,0
+IRA1002,Laptop,HP,ProBook 450 G8,Corporate Services,Esther,ICT Department,-1.285969,36.817083,2022-12-31,2026-11-22,3,1,2026-01-21,Operating system issue,13913.01,Open,436,8,92,1
+IRA1003,Laptop,Lenovo,ThinkPad E14 Gen 4,Intermediaries,Brian,IRA Headquarters,-1.286501,36.817319,2023-02-22,2028-06-29,1,0,2025-12-13,Overheating,4275.69,Resolved,129,0,94,0
+IRA1004,Laptop,Lenovo,ThinkPad E14 Gen 4,Research & Development,Joseph,Actuarial & Data Analytics,-1.286169,36.817196,2017-09-21,2026-05-31,7,2,2026-04-07,Battery replacement,20174.88,Open,685,12,65,1
+IRA1005,Laptop,Lenovo,ThinkPad L14 Gen 2,Finance,Brian,Corporate Services,-1.285652,36.817307,2023-02-19,2027-01-10,4,0,2026-01-10,Overheating,5678.19,Resolved,313,5,88,1
+IRA1006,Laptop,HP,ProBook 450 G8,Actuarial & Data Analytics,Samuel,Intermediaries Department,-1.28687,36.817669,2024-05-08,2027-11-02,1,0,2025-10-23,Battery replacement,17087.01,Resolved,167,3,96,0
+IRA1007,Laptop,Lenovo,ThinkPad L14 Gen 2,Intermediaries,Esther,Finance Department,-1.286495,36.816789,2021-04-21,2027-03-14,3,0,2025-09-16,Screen/display issue,21081.32,Resolved,378,3,91,0
+IRA1008,Laptop,HP,ProBook 450 G8,Procurement,Lydia,Human Resource Department,-1.286079,36.817935,2021-05-05,2027-04-06,2,0,2026-06-23,Operating system issue,18364.71,Resolved,311,1,82,0
+IRA1009,Laptop,HP,ProBook 440 G9,Consumer Protection,Brian,Consumer Protection,-1.286834,36.817324,2019-11-26,2025-10-24,8,3,2026-01-23,System crash,22515.45,Open,676,11,64,1
+IRA1010,Laptop,Dell,Latitude 5420,Procurement,Lydia,Consumer Protection,-1.286955,36.81749,2021-06-06,2026-05-27,5,1,2026-02-14,Operating system issue,12975.36,Open,430,12,49,1
+IRA1011,Laptop,HP,EliteBook 840 G9,Finance,Grace,Corporate Services,-1.286023,36.81746,2025-10-17,2028-03-21,0,0,,No maintenance recorded,0.0,No record,180,2,94,0
+IRA1012,Laptop,HP,EliteBook 840 G9,Legal,Lydia,ICT Department,-1.285951,36.816719,2019-11-09,2026-02-09,5,3,2026-06-25,System crash,20248.55,Open,493,13,74,1
+IRA1013,Laptop,HP,ProBook 450 G8,Finance,Lydia,Intermediaries Department,-1.286462,36.817561,2021-05-28,2026-11-30,3,0,2026-03-20,System crash,7309.92,Resolved,292,7,75,1
+IRA1014,Laptop,Lenovo,ThinkPad T14 Gen 2,Actuarial & Data Analytics,Mark,Actuarial & Data Analytics,-1.285853,36.81726,2021-12-03,2026-12-01,2,1,2025-10-07,System crash,12695.55,Open,441,6,76,0
+IRA1015,Laptop,HP,ProBook 440 G9,Intermediaries,Samuel,Procurement,-1.286154,36.817671,2021-01-09,2026-10-06,5,2,2026-06-22,Charging port issue,16519.99,Open,691,12,47,1
+IRA1016,Laptop,HP,EliteBook 840 G8,Finance,Samuel,Finance Department,-1.286799,36.816799,2022-11-18,2027-04-10,4,1,2025-09-18,Network connectivity issue,24903.39,Open,442,2,75,0
+IRA1017,Laptop,HP,EliteBook 840 G8,Intermediaries,David,Actuarial & Data Analytics,-1.285827,36.81767,2021-07-15,2027-04-03,2,0,2026-06-10,Hard drive/SSD issue,6795.53,Resolved,406,1,92,0
+IRA1018,Laptop,Dell,Latitude 5520,Procurement,Samuel,Actuarial & Data Analytics,-1.286385,36.817447,2024-02-14,2028-06-28,0,0,,No maintenance recorded,0.0,No record,137,3,92,0
+IRA1019,Laptop,HP,ProBook 450 G8,Legal,Mary,Intermediaries Department,-1.286466,36.817154,2025-09-25,2027-12-01,1,0,2026-06-06,Operating system issue,23640.01,Resolved,211,3,96,0
+IRA1020,Laptop,Dell,Latitude 5430,Corporate Services,Ann,Intermediaries Department,-1.286302,36.817216,2017-12-12,2025-10-23,6,1,2026-01-06,Network connectivity issue,18799.57,Open,527,8,67,1
+IRA1021,Laptop,HP,EliteBook 840 G9,ICT,Kevin,Intermediaries Department,-1.286349,36.817206,2023-11-20,2027-11-15,1,0,2026-06-08,Charging port issue,21836.13,Resolved,275,1,92,0
+IRA1022,Laptop,Dell,Latitude 5520,Finance,James,Actuarial & Data Analytics,-1.285859,36.817382,2020-03-20,2026-09-23,5,2,2025-11-15,Charging port issue,17068.07,Open,435,13,67,1
+IRA1023,Laptop,HP,EliteBook 840 G8,Actuarial & Data Analytics,Peter,Procurement,-1.286469,36.81808,2026-01-10,2028-02-18,1,0,2025-12-22,Network connectivity issue,24609.84,Resolved,181,2,99,0
+IRA1024,Laptop,Dell,Latitude 5420,Corporate Services,Mercy,IRA Headquarters,-1.286156,36.817354,2021-09-15,2027-02-08,4,1,2026-02-14,Network connectivity issue,8019.41,Open,343,7,77,1
+IRA1025,Laptop,Lenovo,ThinkPad L14 Gen 2,Corporate Services,Peter,Human Resource Department,-1.286066,36.817463,2023-03-24,2027-06-03,3,1,2025-10-15,Screen/display issue,10300.36,Open,420,7,80,1
+IRA1026,Laptop,Dell,Latitude 5520,Consumer Protection,Mercy,Corporate Services,-1.285684,36.817114,2022-05-12,2027-01-25,2,1,2025-09-19,Overheating,2561.33,Open,418,2,84,0
+IRA1027,Laptop,HP,ProBook 440 G9,Actuarial & Data Analytics,Grace,IRA Headquarters,-1.286647,36.817331,2018-02-05,2025-08-14,7,3,2026-01-18,System crash,10141.41,Open,633,18,57,1
+IRA1028,Laptop,Dell,Latitude 5430,Actuarial & Data Analytics,Naomi,Consumer Protection,-1.286485,36.817774,2021-03-17,2027-01-01,4,0,2025-11-04,RAM upgrade/replacement,14987.44,Resolved,366,3,89,0
+IRA1029,Laptop,Lenovo,ThinkPad T14 Gen 2,Research & Development,Mercy,Corporate Services,-1.286158,36.817004,2023-07-18,2027-12-05,2,0,2025-11-09,System crash,15762.02,Resolved,136,1,98,0
+IRA1030,Laptop,HP,EliteBook 840 G8,Legal,Lydia,Human Resource Department,-1.286605,36.817535,2025-10-06,2027-08-15,0,0,,No maintenance recorded,0.0,No record,168,1,99,0
+IRA1031,Laptop,Dell,Latitude 7420,ICT,Ruth,Actuarial & Data Analytics,-1.286204,36.817677,2023-05-04,2028-02-12,1,0,2026-01-20,System crash,395.93,Resolved,248,0,100,0
+IRA1032,Laptop,Lenovo,ThinkPad E14 Gen 4,Consumer Protection,James,Actuarial & Data Analytics,-1.286174,36.817545,2022-09-11,2027-05-26,3,0,2025-09-18,RAM upgrade/replacement,917.42,Resolved,435,3,89,0
+IRA1033,Laptop,HP,EliteBook 840 G9,Actuarial & Data Analytics,Mary,Corporate Services,-1.286021,36.817474,2020-05-06,2026-02-25,6,2,2025-12-30,Screen/display issue,20914.05,Open,567,15,69,1
+IRA1034,Laptop,Dell,Latitude 5430,Intermediaries,Peter,IRA Headquarters,-1.286419,36.81693,2025-08-05,2027-04-29,0,0,,No maintenance recorded,0.0,No record,229,1,91,0
+IRA1035,Laptop,Dell,Latitude 5520,Legal,Daniel,Intermediaries Department,-1.286547,36.817686,2024-01-02,2028-05-21,2,0,2025-10-10,Battery replacement,23239.96,Resolved,279,1,92,0
+IRA1036,Laptop,Dell,Latitude 5430,Intermediaries,Esther,Procurement,-1.286307,36.81775,2025-04-30,2028-04-09,2,0,2026-06-02,Network connectivity issue,19620.22,Resolved,267,2,98,0
+IRA1037,Laptop,HP,EliteBook 840 G8,ICT,Samuel,Legal Department,-1.286745,36.817264,2024-11-19,2027-10-21,0,0,,No maintenance recorded,0.0,No record,232,3,99,0
+IRA1038,Laptop,Lenovo,ThinkPad T14 Gen 2,Consumer Protection,Joy,Legal Department,-1.286582,36.816985,2025-04-13,2028-06-28,2,0,2026-03-31,System crash,14353.78,Resolved,132,0,92,0
+IRA1039,Laptop,Dell,Latitude 5430,Consumer Protection,Joy,Actuarial & Data Analytics,-1.286108,36.817681,2022-12-22,2027-03-21,3,0,2026-06-20,Keyboard replacement,18071.85,Resolved,392,1,91,0
+IRA1040,Laptop,Lenovo,ThinkPad T14 Gen 2,Consumer Protection,Kevin,IRA Headquarters,-1.286228,36.817082,2018-10-01,2025-12-11,5,2,2025-11-04,Overheating,10781.22,Open,697,16,75,1
+IRA1041,Laptop,Dell,Latitude 5520,Human Resource,Grace,Actuarial & Data Analytics,-1.286083,36.817348,2021-01-27,2026-04-08,5,2,2026-03-14,Network connectivity issue,24421.02,Open,494,11,58,1
+IRA1042,Laptop,HP,EliteBook 840 G8,Finance,Joy,Human Resource Department,-1.286641,36.817449,2019-07-17,2025-11-25,4,3,2026-05-30,System crash,2789.04,Open,423,6,80,1
+IRA1043,Laptop,Dell,Latitude 5520,Actuarial & Data Analytics,Lydia,IRA Headquarters,-1.28669,36.817024,2021-08-03,2027-05-24,3,0,2026-05-18,Network connectivity issue,23740.86,Resolved,375,2,76,0
+IRA1044,Laptop,Dell,Latitude 5430,Research & Development,Lydia,Legal Department,-1.286993,36.816918,2021-06-20,2027-06-07,3,0,2025-09-16,Keyboard replacement,6799.99,Resolved,328,1,78,0
+IRA1045,Laptop,HP,ProBook 440 G9,ICT,Peter,Legal Department,-1.286612,36.817213,2023-01-06,2027-02-26,4,0,2026-04-05,Screen/display issue,19748.74,Resolved,323,5,89,1
+IRA1046,Laptop,Dell,Latitude 5420,Research & Development,Mercy,Actuarial & Data Analytics,-1.286143,36.817478,2023-08-19,2027-05-25,1,0,2025-10-02,Network connectivity issue,23049.52,Resolved,85,1,100,0
+IRA1047,Laptop,Lenovo,ThinkPad T14 Gen 2,Human Resource,James,Consumer Protection,-1.286565,36.817553,2022-03-26,2027-06-09,3,0,2026-06-17,Keyboard replacement,24057.3,Resolved,438,6,83,1
+IRA1048,Laptop,Lenovo,ThinkPad L14 Gen 2,Procurement,Brian,IRA Headquarters,-1.286445,36.81742,2024-08-20,2028-03-17,0,0,,No maintenance recorded,0.0,No record,183,2,90,0
+IRA1049,Laptop,Dell,Latitude 5520,Corporate Services,Daniel,Human Resource Department,-1.286424,36.817929,2022-12-05,2027-07-11,2,0,2025-12-13,Operating system issue,8034.3,Resolved,323,7,92,0
+IRA1050,Laptop,Lenovo,ThinkPad E14 Gen 3,Research & Development,Joy,Corporate Services,-1.286148,36.817567,2022-10-08,2027-07-13,2,1,2026-03-19,RAM upgrade/replacement,3492.58,Open,410,8,76,0
+IRA1051,Laptop,HP,ProBook 450 G8,Procurement,Mercy,Actuarial & Data Analytics,-1.286342,36.817803,2024-07-01,2028-01-26,1,0,2025-12-09,Operating system issue,16280.81,Resolved,174,0,91,0
+IRA1052,Laptop,Lenovo,ThinkPad L14 Gen 2,Corporate Services,Brian,Corporate Services,-1.285828,36.817046,2024-08-29,2027-07-02,0,0,,No maintenance recorded,0.0,No record,168,1,97,0
+IRA1053,Laptop,Dell,Latitude 7420,Legal,John,Consumer Protection,-1.286616,36.817414,2021-10-02,2027-07-08,2,0,2025-11-28,Overheating,8477.89,Resolved,471,3,89,0
+IRA1054,Laptop,HP,ProBook 440 G9,Procurement,Kevin,Legal Department,-1.286637,36.817359,2020-04-08,2026-03-07,7,1,2026-07-15,Hard drive/SSD issue,12681.71,Open,595,17,54,1
+IRA1055,Laptop,HP,EliteBook 840 G9,ICT,Joy,Intermediaries Department,-1.286511,36.817671,2023-06-04,2027-03-15,4,0,2025-11-02,Charging port issue,23864.95,Resolved,336,7,77,1
+IRA1056,Laptop,Lenovo,ThinkPad E14 Gen 3,Procurement,Esther,ICT Department,-1.285993,36.816855,2018-09-07,2026-02-15,6,1,2026-03-02,Battery replacement,1388.28,Open,450,8,73,1
+IRA1057,Laptop,Dell,Latitude 5430,Finance,James,Consumer Protection,-1.286703,36.817472,2023-03-02,2026-12-10,4,0,2025-10-08,Hard drive/SSD issue,5996.66,Resolved,406,7,82,1
+IRA1058,Laptop,Dell,Latitude 5520,Research & Development,Esther,Intermediaries Department,-1.286875,36.817317,2020-06-08,2026-11-12,6,3,2026-04-23,Charging port issue,21370.05,Open,617,13,74,1
+IRA1059,Laptop,Lenovo,ThinkPad L14 Gen 2,Human Resource,Naomi,IRA Headquarters,-1.286503,36.817296,2024-11-12,2027-04-23,2,0,2026-03-09,Keyboard replacement,15274.86,Resolved,214,0,97,0
+IRA1060,Laptop,Dell,Latitude 5430,Intermediaries,Mark,IRA Headquarters,-1.286372,36.81753,2022-03-12,2027-01-06,3,0,2026-05-05,Keyboard replacement,3520.95,Resolved,273,5,85,1
+IRA1061,Laptop,Lenovo,ThinkPad L14 Gen 2,Actuarial & Data Analytics,Daniel,Finance Department,-1.286173,36.817252,2023-04-20,2027-09-17,1,0,2025-12-06,Operating system issue,3733.74,Resolved,261,2,100,0
+IRA1062,Laptop,Lenovo,ThinkPad L14 Gen 2,Intermediaries,Naomi,Legal Department,-1.286431,36.817143,2019-11-27,2026-06-17,8,1,2026-04-05,System crash,869.36,Open,534,17,68,1
+IRA1063,Laptop,HP,ProBook 450 G8,Consumer Protection,Daniel,Finance Department,-1.286686,36.817026,2025-10-21,2027-05-08,0,0,,No maintenance recorded,0.0,No record,147,3,89,0
+IRA1064,Laptop,Dell,Latitude 5520,Research & Development,Faith,Legal Department,-1.286791,36.81706,2025-07-10,2027-11-17,2,0,2026-01-06,Screen/display issue,1059.73,Resolved,237,0,95,0
+IRA1065,Laptop,Dell,Latitude 5420,Legal,John,Consumer Protection,-1.286732,36.817165,2024-12-23,2027-11-08,2,0,2026-06-17,Keyboard replacement,16132.19,Resolved,140,1,89,0
+IRA1066,Laptop,HP,ProBook 440 G9,Procurement,Samuel,Actuarial & Data Analytics,-1.286349,36.817241,2019-03-27,2026-08-28,8,1,2026-08-01,Screen/display issue,21495.55,Open,519,15,54,1
+IRA1067,Laptop,HP,ProBook 450 G8,ICT,Mark,Intermediaries Department,-1.286617,36.817595,2020-04-18,2025-10-05,5,3,2025-11-06,Operating system issue,18705.22,Open,535,6,53,1
+IRA1068,Laptop,Lenovo,ThinkPad E14 Gen 3,Consumer Protection,Grace,Consumer Protection,-1.286557,36.817448,2018-08-14,2026-10-16,8,1,2026-07-18,Battery replacement,24965.02,Open,666,14,74,1
+IRA1069,Laptop,Dell,Latitude 7420,Intermediaries,Lydia,ICT Department,-1.286059,36.817247,2023-04-07,2027-04-15,2,0,2025-09-27,Charging port issue,2704.67,Resolved,347,5,89,0
+IRA1070,Laptop,Lenovo,ThinkPad E14 Gen 4,Corporate Services,Joy,Corporate Services,-1.286172,36.817618,2025-03-16,2027-12-07,1,0,2026-02-23,Charging port issue,7984.96,Resolved,172,3,99,0
+IRA1071,Laptop,HP,ProBook 450 G8,Intermediaries,Ruth,ICT Department,-1.285938,36.817309,2022-08-24,2027-01-05,4,1,2026-02-15,Operating system issue,10417.51,Open,392,1,92,0
+IRA1072,Laptop,Lenovo,ThinkPad E14 Gen 3,Human Resource,Ruth,Procurement,-1.286016,36.817852,2022-05-28,2027-01-18,2,1,2026-02-04,RAM upgrade/replacement,9347.14,Open,418,8,82,0
+IRA1073,Laptop,Lenovo,ThinkPad E14 Gen 3,Procurement,James,Finance Department,-1.286801,36.817169,2018-09-05,2026-10-22,6,3,2026-05-21,Network connectivity issue,16519.28,Open,573,16,45,1
+IRA1074,Laptop,HP,ProBook 440 G9,Corporate Services,Ruth,Legal Department,-1.286993,36.81706,2022-11-20,2027-04-15,2,0,2026-05-14,Network connectivity issue,1481.62,Resolved,448,2,76,0
+IRA1075,Laptop,Dell,Latitude 7420,Corporate Services,Peter,Finance Department,-1.286161,36.816688,2020-02-09,2025-09-02,8,1,2026-02-26,Battery replacement,5707.83,Open,545,20,78,1
+IRA1076,Laptop,Dell,Latitude 5430,Actuarial & Data Analytics,Daniel,Finance Department,-1.286382,36.816898,2022-05-09,2027-06-08,2,0,2026-04-07,RAM upgrade/replacement,14078.41,Resolved,294,3,87,0
+IRA1077,Laptop,Lenovo,ThinkPad E14 Gen 3,Corporate Services,Kevin,IRA Headquarters,-1.28663,36.817513,2022-04-20,2027-05-26,2,0,2026-01-07,Battery replacement,24163.44,Resolved,431,7,84,0
+IRA1078,Laptop,Lenovo,ThinkPad L14 Gen 2,Intermediaries,Ann,Legal Department,-1.286528,36.816905,2024-10-30,2027-11-10,0,0,,No maintenance recorded,0.0,No record,204,0,94,0
+IRA1079,Laptop,HP,ProBook 450 G8,Research & Development,Brian,Consumer Protection,-1.287043,36.817681,2018-10-17,2026-08-31,6,2,2026-03-24,Keyboard replacement,4544.1,Open,475,12,51,1
+IRA1080,Laptop,HP,EliteBook 840 G9,Consumer Protection,Samuel,Procurement,-1.28624,36.817662,2024-02-17,2028-07-13,1,0,2026-05-17,System crash,1940.08,Resolved,214,2,98,0
+IRA1081,Laptop,Lenovo,ThinkPad E14 Gen 3,Legal,Mary,Consumer Protection,-1.286744,36.817818,2021-04-29,2026-01-12,7,2,2025-10-02,RAM upgrade/replacement,9765.94,Open,546,7,50,1
+IRA1082,Laptop,Dell,Latitude 5430,Legal,Mark,Procurement,-1.286244,36.817758,2022-06-01,2027-04-24,2,0,2026-05-06,Battery replacement,6381.66,Resolved,432,2,91,0
+IRA1083,Laptop,Lenovo,ThinkPad E14 Gen 4,Legal,Samuel,Human Resource Department,-1.286259,36.817521,2024-10-26,2027-10-09,1,0,2026-02-12,Operating system issue,8409.85,Resolved,243,0,100,0
+IRA1084,Laptop,Lenovo,ThinkPad E14 Gen 4,Legal,Lydia,ICT Department,-1.286054,36.816709,2023-03-26,2027-09-24,0,0,,No maintenance recorded,0.0,No record,237,3,90,0
+IRA1085,Laptop,Dell,Latitude 5520,Actuarial & Data Analytics,Grace,Consumer Protection,-1.287054,36.817204,2020-03-22,2026-01-09,7,3,2025-11-27,Keyboard replacement,5856.94,Open,558,10,58,1
+IRA1086,Laptop,Lenovo,ThinkPad E14 Gen 3,Legal,Mercy,Procurement,-1.286384,36.817761,2021-02-16,2026-09-06,7,1,2026-01-04,Overheating,16989.98,Open,719,10,73,1
+IRA1087,Laptop,Lenovo,ThinkPad T14 Gen 2,Finance,Naomi,Consumer Protection,-1.286474,36.817722,2020-02-22,2026-11-04,7,1,2026-01-19,RAM upgrade/replacement,13304.63,Open,692,19,74,1
+IRA1088,Laptop,HP,EliteBook 840 G8,ICT,Brian,Corporate Services,-1.285991,36.817532,2023-05-31,2028-04-17,2,0,2026-05-12,Screen/display issue,11370.65,Resolved,286,0,92,0
+IRA1089,Laptop,HP,EliteBook 840 G9,Legal,David,IRA Headquarters,-1.286295,36.817404,2022-10-31,2027-05-16,3,1,2026-02-20,Operating system issue,21019.61,Open,270,6,82,1
+IRA1090,Laptop,HP,EliteBook 840 G8,Consumer Protection,Mercy,Intermediaries Department,-1.286524,36.817346,2024-11-11,2027-04-21,1,0,2026-05-18,RAM upgrade/replacement,23520.59,Resolved,90,0,92,0
+IRA1091,Laptop,HP,EliteBook 840 G8,Intermediaries,Naomi,IRA Headquarters,-1.286649,36.81715,2021-03-22,2026-09-09,8,2,2025-11-12,Network connectivity issue,6237.97,Open,655,22,46,1
+IRA1092,Laptop,Dell,Latitude 5430,Procurement,Esther,Legal Department,-1.286721,36.817195,2017-09-01,2025-08-11,4,3,2025-10-23,Battery replacement,9913.73,Open,669,22,77,1
+IRA1093,Laptop,Dell,Latitude 5420,Legal,Joy,ICT Department,-1.286071,36.817337,2021-12-14,2027-04-19,4,1,2026-02-10,Hard drive/SSD issue,20802.0,Open,284,1,86,0
+IRA1094,Laptop,Lenovo,ThinkPad E14 Gen 4,Actuarial & Data Analytics,Mary,ICT Department,-1.285979,36.816981,2026-01-10,2027-07-31,1,0,2026-02-25,RAM upgrade/replacement,10106.05,Resolved,81,1,88,0
+IRA1095,Laptop,Lenovo,ThinkPad E14 Gen 4,Human Resource,Kevin,Human Resource Department,-1.286344,36.81753,2023-07-06,2027-10-05,0,0,,No maintenance recorded,0.0,No record,139,0,100,0
+IRA1096,Laptop,Dell,Latitude 5520,Actuarial & Data Analytics,John,Corporate Services,-1.285774,36.817332,2023-04-17,2028-01-09,1,0,2026-06-23,Charging port issue,15160.72,Resolved,138,0,99,0
+IRA1097,Laptop,HP,ProBook 450 G8,Legal,Brian,Finance Department,-1.286164,36.817314,2022-07-08,2027-06-15,4,1,2025-09-22,Charging port issue,7045.25,Open,339,8,76,1
+IRA1098,Laptop,Lenovo,ThinkPad T14 Gen 2,Legal,Joseph,Consumer Protection,-1.286894,36.817418,2025-09-10,2027-05-04,2,0,2026-06-29,Keyboard replacement,19518.26,Resolved,106,3,88,0
+IRA1099,Laptop,HP,ProBook 440 G9,Consumer Protection,Lydia,Human Resource Department,-1.286301,36.817521,2023-05-10,2027-05-06,2,1,2026-06-05,Battery replacement,18457.95,Open,351,6,83,0
