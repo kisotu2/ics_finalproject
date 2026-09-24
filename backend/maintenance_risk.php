@@ -3,17 +3,36 @@
 /**
  * Predictive Maintenance Risk
  *
- * Retrieves current asset information from MySQL,
- * prepares the seven ML features, sends them to the
- * Flask Logistic Regression API, and optionally stores
- * the prediction in maintenance_risk_predictions.
+ * The PHP application retrieves current asset information from MySQL,
+ * prepares the seven features required by the trained Logistic
+ * Regression model, and sends them to the Flask ML API.
+ *
+ * The Flask service is responsible for loading the trained model
+ * and performing the prediction.
  */
 
 require_once __DIR__ . '/../db.php';
 
 
+/**
+ * Calculate predictive maintenance risk.
+ *
+ * Supports both:
+ *
+ *     maintenance_risk(10)
+ *
+ * and the existing application's:
+ *
+ *     maintenance_risk($asset)
+ *
+ * where $asset contains either [id] or [laptop_id].
+ *
+ * @param int|array $asset
+ * @param bool $savePrediction
+ * @return array
+ */
 function maintenance_risk(
-    int $laptopId,
+    int|array $asset,
     bool $savePrediction = false
 ): array {
 
@@ -22,43 +41,99 @@ function maintenance_risk(
 
     /*
      * ---------------------------------------------------------
-     * 1. Get laptop information
+     * 1. Resolve laptop ID
      * ---------------------------------------------------------
      */
 
-    $stmt = $conn->prepare("
-        SELECT
-            id,
-            asset_tag,
-            brand,
-            model,
-            status,
-            purchase_date,
-            warranty_expiry
-        FROM laptops
-        WHERE id = ?
-        LIMIT 1
-    ");
+    if (is_array($asset)) {
 
-    $stmt->bind_param("i", $laptopId);
-    $stmt->execute();
+        $laptopId = (int)(
+            $asset['laptop_id']
+            ?? $asset['id']
+            ?? 0
+        );
 
-    $result = $stmt->get_result();
-    $laptop = $result->fetch_assoc();
+    } else {
 
-    $stmt->close();
+        $laptopId = (int)$asset;
+    }
 
-    if (!$laptop) {
+
+    if ($laptopId <= 0) {
+
         return [
             'success' => false,
-            'error' => 'Laptop not found.'
+            'error' => 'A valid laptop ID was not provided.',
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => []
         ];
     }
 
 
     /*
      * ---------------------------------------------------------
-     * 2. Calculate asset age
+     * 2. Retrieve laptop information
+     * ---------------------------------------------------------
+     */
+
+    try {
+
+        $stmt = $conn->prepare("
+            SELECT
+                id,
+                asset_tag,
+                brand,
+                model,
+                status,
+                purchase_date,
+                warranty_expiry
+            FROM laptops
+            WHERE id = ?
+            LIMIT 1
+        ");
+
+        $stmt->bind_param("i", $laptopId);
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        $laptop = $result->fetch_assoc();
+
+        $stmt->close();
+
+    } catch (Throwable $e) {
+
+        return [
+            'success' => false,
+            'error' => 'Unable to retrieve laptop information.',
+            'details' => $e->getMessage(),
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => []
+        ];
+    }
+
+
+    if (!$laptop) {
+
+        return [
+            'success' => false,
+            'error' => 'Laptop not found.',
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => []
+        ];
+    }
+
+
+    /*
+     * ---------------------------------------------------------
+     * 3. Calculate asset age
      * ---------------------------------------------------------
      */
 
@@ -78,7 +153,7 @@ function maintenance_risk(
 
             $assetAgeYears = $days / 365.25;
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
 
             $assetAgeYears = 0;
         }
@@ -87,7 +162,7 @@ function maintenance_risk(
 
     /*
      * ---------------------------------------------------------
-     * 3. Calculate remaining warranty
+     * 4. Calculate warranty days remaining
      * ---------------------------------------------------------
      */
 
@@ -109,7 +184,7 @@ function maintenance_risk(
                     $today->diff($warrantyExpiry)->days;
             }
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
 
             $warrantyDaysRemaining = 0;
         }
@@ -118,113 +193,189 @@ function maintenance_risk(
 
     /*
      * ---------------------------------------------------------
-     * 4. Maintenance history
+     * 5. Maintenance history
      * ---------------------------------------------------------
      */
 
-    $stmt = $conn->prepare("
-        SELECT
-            COUNT(*) AS repair_count,
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN status IN ('open', 'in_progress')
-                        THEN 1
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS open_repair_count
-        FROM maintenance_records
-        WHERE laptop_id = ?
-    ");
+    $repairCount = 0;
+    $openRepairCount = 0;
 
-    $stmt->bind_param("i", $laptopId);
-    $stmt->execute();
+    try {
 
-    $result = $stmt->get_result();
-    $maintenance = $result->fetch_assoc();
+        $stmt = $conn->prepare("
+            SELECT
+                COUNT(*) AS repair_count,
 
-    $stmt->close();
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN status IN ('open', 'in_progress')
+                            THEN 1
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS open_repair_count
 
-    $repairCount =
-        (int)($maintenance['repair_count'] ?? 0);
+            FROM maintenance_records
 
-    $openRepairCount =
-        (int)($maintenance['open_repair_count'] ?? 0);
+            WHERE laptop_id = ?
+        ");
+
+        $stmt->bind_param("i", $laptopId);
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        $maintenance = $result->fetch_assoc();
+
+        $stmt->close();
+
+        $repairCount =
+            (int)($maintenance['repair_count'] ?? 0);
+
+        $openRepairCount =
+            (int)($maintenance['open_repair_count'] ?? 0);
+
+    } catch (Throwable $e) {
+
+        return [
+            'success' => false,
+            'error' => 'Unable to retrieve maintenance history.',
+            'details' => $e->getMessage(),
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => []
+        ];
+    }
 
 
     /*
      * ---------------------------------------------------------
-     * 5. Usage during the last 30 days
+     * 6. Usage data for the last 30 days
      * ---------------------------------------------------------
      */
 
-    $stmt = $conn->prepare("
-        SELECT
-            COUNT(*) AS usage_records_30d,
-            COALESCE(SUM(active_hours), 0)
-                AS active_hours_30d,
-            COALESCE(SUM(crash_count), 0)
-                AS crash_count_30d
-        FROM device_usage_daily
-        WHERE laptop_id = ?
-          AND usage_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-          AND usage_date <= CURDATE()
-    ");
+    $usageRecords30d = 0;
+    $activeHours30d = 0;
+    $crashCount30d = 0;
 
-    $stmt->bind_param("i", $laptopId);
-    $stmt->execute();
+    try {
 
-    $result = $stmt->get_result();
-    $usage = $result->fetch_assoc();
+        $stmt = $conn->prepare("
+            SELECT
+                COUNT(*) AS usage_records_30d,
 
-    $stmt->close();
+                COALESCE(
+                    SUM(active_hours),
+                    0
+                ) AS active_hours_30d,
 
-    $usageRecords30d =
-        (int)($usage['usage_records_30d'] ?? 0);
+                COALESCE(
+                    SUM(crash_count),
+                    0
+                ) AS crash_count_30d
 
-    $activeHours30d =
-        (float)($usage['active_hours_30d'] ?? 0);
+            FROM device_usage_daily
 
-    $crashCount30d =
-        (int)($usage['crash_count_30d'] ?? 0);
+            WHERE laptop_id = ?
+
+              AND usage_date >=
+                  DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+
+              AND usage_date <= CURDATE()
+        ");
+
+        $stmt->bind_param("i", $laptopId);
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        $usage = $result->fetch_assoc();
+
+        $stmt->close();
+
+        $usageRecords30d =
+            (int)($usage['usage_records_30d'] ?? 0);
+
+        $activeHours30d =
+            (float)($usage['active_hours_30d'] ?? 0);
+
+        $crashCount30d =
+            (int)($usage['crash_count_30d'] ?? 0);
+
+    } catch (Throwable $e) {
+
+        return [
+            'success' => false,
+            'error' => 'Unable to retrieve device usage information.',
+            'details' => $e->getMessage(),
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => []
+        ];
+    }
 
 
     /*
      * ---------------------------------------------------------
-     * 6. Latest battery health
+     * 7. Latest battery health
      * ---------------------------------------------------------
      */
 
-    $stmt = $conn->prepare("
-        SELECT
-            battery_health_percent
-        FROM device_usage_daily
-        WHERE laptop_id = ?
-          AND battery_health_percent IS NOT NULL
-        ORDER BY usage_date DESC, id DESC
-        LIMIT 1
-    ");
+    $batteryHealth = 100;
 
-    $stmt->bind_param("i", $laptopId);
-    $stmt->execute();
+    try {
 
-    $result = $stmt->get_result();
-    $battery = $result->fetch_assoc();
+        $stmt = $conn->prepare("
+            SELECT
+                battery_health_percent
 
-    $stmt->close();
+            FROM device_usage_daily
 
-    $batteryHealth = isset(
-        $battery['battery_health_percent']
-    )
-        ? (float)$battery['battery_health_percent']
-        : 100;
+            WHERE laptop_id = ?
+
+              AND battery_health_percent IS NOT NULL
+
+            ORDER BY
+                usage_date DESC,
+                id DESC
+
+            LIMIT 1
+        ");
+
+        $stmt->bind_param("i", $laptopId);
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        $battery = $result->fetch_assoc();
+
+        $stmt->close();
+
+        if (
+            $battery &&
+            $battery['battery_health_percent'] !== null
+        ) {
+
+            $batteryHealth =
+                (float)$battery['battery_health_percent'];
+        }
+
+    } catch (Throwable $e) {
+
+        $batteryHealth = 100;
+    }
 
 
     /*
      * ---------------------------------------------------------
-     * 7. Build the seven ML features
+     * 8. Build exactly the seven model features
      * ---------------------------------------------------------
      */
 
@@ -255,13 +406,30 @@ function maintenance_risk(
 
     /*
      * ---------------------------------------------------------
-     * 8. Send features to Flask
+     * 9. Call Flask ML API
      * ---------------------------------------------------------
      */
 
     $url = 'http://127.0.0.1:5000/predict';
 
-    $payload = json_encode($features);
+    $payload = json_encode(
+        $features,
+        JSON_UNESCAPED_SLASHES
+    );
+
+
+    if ($payload === false) {
+
+        return [
+            'success' => false,
+            'error' => 'Unable to encode prediction data.',
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => $features
+        ];
+    }
+
 
     $ch = curl_init($url);
 
@@ -272,7 +440,9 @@ function maintenance_risk(
         CURLOPT_POSTFIELDS => $payload,
 
         CURLOPT_HTTPHEADER => [
+
             'Content-Type: application/json',
+
             'Accept: application/json'
         ],
 
@@ -282,6 +452,7 @@ function maintenance_risk(
 
         CURLOPT_TIMEOUT => 15
     ]);
+
 
     $response = curl_exec($ch);
 
@@ -295,26 +466,37 @@ function maintenance_risk(
         return [
             'success' => false,
             'error' =>
-                'Unable to connect to predictive maintenance service.',
-            'details' => $error
+                'The predictive maintenance service is unavailable.',
+            'details' => $error,
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => $features,
+            'usage_records_30d' => $usageRecords30d
         ];
     }
 
 
     $httpCode =
-        curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_getinfo(
+            $ch,
+            CURLINFO_HTTP_CODE
+        );
 
     curl_close($ch);
 
 
     /*
      * ---------------------------------------------------------
-     * 9. Process Flask response
+     * 10. Decode Flask response
      * ---------------------------------------------------------
      */
 
     $prediction =
-        json_decode($response, true);
+        json_decode(
+            $response,
+            true
+        );
 
 
     if (
@@ -325,23 +507,56 @@ function maintenance_risk(
         return [
             'success' => false,
             'error' =>
-                'Predictive maintenance service returned an invalid response.',
+                'The predictive maintenance service returned an invalid response.',
             'http_code' => $httpCode,
-            'response' => $response
+            'response' => $response,
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => $features,
+            'usage_records_30d' => $usageRecords30d
         ];
     }
 
 
+    /*
+     * ---------------------------------------------------------
+     * 11. Extract prediction
+     * ---------------------------------------------------------
+     */
+
     $score =
-        (float)($prediction['probability'] ?? 0);
+        (float)(
+            $prediction['probability']
+            ?? 0
+        );
 
     $level =
-        $prediction['risk_level'] ?? 'Unknown';
+        (string)(
+            $prediction['risk_level']
+            ?? 'Unknown'
+        );
+
+    $predictionValue =
+        (int)(
+            $prediction['prediction']
+            ?? 0
+        );
 
 
     /*
      * ---------------------------------------------------------
-     * 10. Save prediction if requested
+     * 12. Model version
+     * ---------------------------------------------------------
+     */
+
+    $modelVersion =
+        'logistic-regression-v1';
+
+
+    /*
+     * ---------------------------------------------------------
+     * 13. Save prediction when explicitly requested
      * ---------------------------------------------------------
      */
 
@@ -349,57 +564,65 @@ function maintenance_risk(
 
     if ($savePrediction) {
 
-        /*
-         * The factors column stores the exact feature values
-         * used for this prediction.
-         */
         $factors = json_encode(
             $features,
             JSON_UNESCAPED_SLASHES
         );
 
-        /*
-         * Deployment/model version.
-         *
-         * Keep this identifier consistent with the model
-         * deployed in flask_api/maintenance_model.json.
-         */
-        $modelVersion = 'logistic-regression-v1';
 
-        $stmt = $conn->prepare("
-            INSERT INTO maintenance_risk_predictions
-            (
-                laptop_id,
-                risk_score,
-                risk_level,
-                model_version,
-                factors,
-                predicted_at
-            )
-            VALUES
-            (?, ?, ?, ?, ?, NOW())
-        ");
+        try {
 
-        $stmt->bind_param(
-            "idsss",
-            $laptopId,
-            $score,
-            $level,
-            $modelVersion,
-            $factors
-        );
+            $stmt = $conn->prepare("
+                INSERT INTO maintenance_risk_predictions
+                (
+                    laptop_id,
+                    risk_score,
+                    risk_level,
+                    model_version,
+                    factors,
+                    predicted_at
+                )
+                VALUES
+                (?, ?, ?, ?, ?, NOW())
+            ");
 
-        $stmt->execute();
 
-        $stmt->close();
+            $stmt->bind_param(
+                "idsss",
+                $laptopId,
+                $score,
+                $level,
+                $modelVersion,
+                $factors
+            );
 
-        $predictionSaved = true;
+
+            $stmt->execute();
+
+            $stmt->close();
+
+            $predictionSaved = true;
+
+        } catch (Throwable $e) {
+
+            return [
+                'success' => false,
+                'error' =>
+                    'Prediction was generated but could not be saved.',
+                'details' => $e->getMessage(),
+                'score' => $score,
+                'level' => $level,
+                'version' => $modelVersion,
+                'features' => $features,
+                'usage_records_30d' => $usageRecords30d
+            ];
+        }
     }
 
 
     /*
      * ---------------------------------------------------------
-     * 11. Return complete result
+     * 14. Return complete result
      * ---------------------------------------------------------
      */
 
@@ -423,13 +646,16 @@ function maintenance_risk(
             $laptop['status'],
 
         'prediction' =>
-            (int)($prediction['prediction'] ?? 0),
+            $predictionValue,
 
         'score' =>
             $score,
 
         'level' =>
             $level,
+
+        'version' =>
+            $modelVersion,
 
         'features' =>
             $features,
