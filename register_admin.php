@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <form method="POST">
 <input type="email" name="email" placeholder="Admin Email" required>
 <input type="password" name="password" placeholder="Password" required>
-<button type="submit">Create Admin</button>
+<button type="submit">Create New Admin</button>
 </form>
 
 </body>
