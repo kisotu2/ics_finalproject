@@ -17,7 +17,7 @@ if(!isset($tables[$category])){
 
 $table = $tables[$category];
 
-// CHECK DUPLICATE
+// CHECK DUPLICATE FROM THE DATABASE
 $stmt = $conn->prepare("SELECT id FROM $table WHERE asset_tag=? OR serial_number=?");
 $stmt->bind_param("ss",$asset_tag,$serial);
 $stmt->execute();
