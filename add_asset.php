@@ -98,7 +98,7 @@ body {
 <label>Purchase Date</label>
 <input type="date" name="purchase_date">
 
-<label>Warranty Expiry</label>
+<label>Warranty Expiry Date</label>
 <input type="date" name="warranty_expiry">
 
 <button type="submit" name="add_asset">Register Asset</button>
