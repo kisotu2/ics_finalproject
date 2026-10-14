@@ -1,4 +1,5 @@
 <?php
+//Report generation for Softwares in pdf format
 require 'db.php';
 require_once(__DIR__ . '/tcpdf/src/Tcpdf.php');
 
