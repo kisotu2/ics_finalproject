@@ -1,5 +1,5 @@
 <?php
-// edit_laptop.php data
+// edit_laptop.php data both in database and page
 require 'db.php';
 session_start();
 
