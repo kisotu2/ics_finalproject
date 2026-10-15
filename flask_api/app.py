@@ -1,4 +1,6 @@
-from flask import Flask, request, jsonify
+import os
+
+from flask import Flask, jsonify, request
 from model_loader import predict_maintenance
 
 app = Flask(__name__)
@@ -16,7 +18,10 @@ def home():
 def predict():
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+
+        if not isinstance(data, dict):
+            return jsonify({"error": "Request body must be a JSON object."}), 400
 
         required_fields = [
             "repair_count",
@@ -43,16 +48,13 @@ def predict():
 
         return jsonify(result)
 
-    except Exception as error:
-
-        return jsonify({
-            "error": str(error)
-        }), 500
+    except (TypeError, ValueError):
+        return jsonify({"error": "All feature values must be numeric."}), 400
 
 
 if __name__ == "__main__":
     app.run(
         host="127.0.0.1",
         port=5000,
-        debug=True
+        debug=os.getenv("FLASK_DEBUG") == "1"
     )

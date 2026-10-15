@@ -26,15 +26,15 @@ A PHP and MySQL application for managing organisational laptops throughout their
 
 - XAMPP with Apache and MySQL running
 - PHP with the MySQLi extension enabled
-- A browser pointed at `http://localhost/Asset/`
+- A browser pointed at `http://localhost/ics_finalproject/` (or the folder name you use under `htdocs`)
 
 ### Installation
 
-1. Place the project in XAMPP's `htdocs` directory as `Asset`.
+1. Place the project in XAMPP's `htdocs` directory as `ics_finalproject`.
 2. Start **Apache** and **MySQL** in the XAMPP control panel.
-3. Visit [http://localhost/Asset/install.php](http://localhost/Asset/install.php), enter your local MySQL credentials, and install the schema.
+3. Visit [http://localhost/ics_finalproject/install.php](http://localhost/ics_finalproject/install.php), enter your local MySQL credentials, and install the schema.
 4. Create a local `config.php` file in the project root. It is intentionally ignored by Git. Database credentials may alternatively be supplied through the `ASSET_DB_HOST`, `ASSET_DB_USER`, `ASSET_DB_PASSWORD`, and `ASSET_DB_NAME` environment variables.
-5. Open [http://localhost/Asset/create_super_admin.php](http://localhost/Asset/create_super_admin.php) once to create the first administrator, then sign in.
+5. Open [http://localhost/ics_finalproject/create_super_admin.php](http://localhost/ics_finalproject/create_super_admin.php) once to create the first administrator, then sign in.
 
 Use this minimal `config.php` when configuration values are needed locally:
 
@@ -67,11 +67,13 @@ For an existing database, import [`migrations/20260812_add_predictive_maintenanc
 
 The Maintenance page accepts daily active hours, crash counts, and battery health. It estimates maintenance failure risk using repair history, asset age, warranty remaining, and usage data. New installations begin with an explainable baseline, so the feature is useful before historical data is available.
 
-After collecting at least 30 labelled historical records, train a local model with a CSV containing a `failed_within_90_days` column set to `0` or `1`:
+After collecting at least 30 labelled historical records, train a local model with a CSV containing a `maintenance_within_30_days` column set to `0` or `1`. The command exports the API-compatible model to `flask_api/maintenance_model.json`:
 
 ```bash
 python3 ml/train_maintenance_model.py your_training_data.csv
 ```
+
+Install Python dependencies first with `python3 -m pip install -r requirements.txt`. Run the Flask service with `python3 flask_api/app.py`; it listens only on `127.0.0.1:5000` by default.
 
 ## Software licences
 
