@@ -229,7 +229,7 @@ th {
 
 <datalist id="usernames">
 <?php while($u = $userList->fetch_assoc()): ?>
-<option value="<?= htmlspecialchars($u['full_name']) ?>">
+<option value="<?= htmlspecialchars($u['full_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
 <?php endwhile; ?>
 </datalist>
 
@@ -260,11 +260,11 @@ th {
 <?php if($result->num_rows > 0): ?>
     <?php while($row = $result->fetch_assoc()): ?>
     <tr>
-        <td><?= htmlspecialchars($row['asset_tag']) ?></td>
-        <td><?= htmlspecialchars($row['user_name']) ?></td>
-        <td><?= htmlspecialchars($row['admin_name']) ?></td>
-        <td><?= htmlspecialchars($row['action_type']) ?></td>
-        <td><?= htmlspecialchars($row['action_date']) ?></td>
+        <td><?= htmlspecialchars($row['asset_tag'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+        <td><?= htmlspecialchars($row['user_name'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+        <td><?= htmlspecialchars($row['admin_name'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+        <td><?= htmlspecialchars($row['action_type'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+        <td><?= htmlspecialchars($row['action_date'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
     </tr>
     <?php endwhile; ?>
 <?php else: ?>
