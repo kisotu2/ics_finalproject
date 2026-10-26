@@ -17,8 +17,10 @@ require_login(['admin', 'super_admin']);
 $laptopWhere = "WHERE 1=1";
 $softwareWhere = "WHERE 1=1";
 
-$params = [];
-$types  = "";
+$laptopParams = [];
+$softwareParams = [];
+$laptopTypes = "";
+$softwareTypes = "";
 
 /* =====================================================
    FILTER: USER NAME
@@ -31,30 +33,34 @@ if (!empty($_GET['user_name'])) {
     $laptopWhere .= " AND u.full_name LIKE ?";
     $softwareWhere .= " AND u.full_name LIKE ?";
 
-    $params[] = "%{$userName}%";
-    $params[] = "%{$userName}%";
-
-    $types .= "ss";
+    $laptopParams[] = "%{$userName}%";
+    $softwareParams[] = "%{$userName}%";
+    $laptopTypes .= "s";
+    $softwareTypes .= "s";
 }
 
 /* =====================================================
    FILTER: DATE RANGE
 ===================================================== */
 
-if (!empty($_GET['from']) && !empty($_GET['to'])) {
-
+if (!empty($_GET['from'])) {
     $from = $_GET['from'] . " 00:00:00";
-    $to   = $_GET['to'] . " 23:59:59";
+    $laptopWhere .= " AND h.action_date >= ?";
+    $softwareWhere .= " AND sh.action_date >= ?";
+    $laptopParams[] = $from;
+    $softwareParams[] = $from;
+    $laptopTypes .= "s";
+    $softwareTypes .= "s";
+}
 
-    $laptopWhere .= " AND h.action_date BETWEEN ? AND ?";
-    $softwareWhere .= " AND sh.action_date BETWEEN ? AND ?";
-
-    $params[] = $from;
-    $params[] = $to;
-    $params[] = $from;
-    $params[] = $to;
-
-    $types .= "ssss";
+if (!empty($_GET['to'])) {
+    $to = $_GET['to'] . " 23:59:59";
+    $laptopWhere .= " AND h.action_date <= ?";
+    $softwareWhere .= " AND sh.action_date <= ?";
+    $laptopParams[] = $to;
+    $softwareParams[] = $to;
+    $laptopTypes .= "s";
+    $softwareTypes .= "s";
 }
 
 /* =====================================================
@@ -65,6 +71,7 @@ $query = "
 
 SELECT
     l.asset_tag COLLATE utf8mb4_unicode_ci AS asset_tag,
+    u.id AS user_id,
     u.full_name COLLATE utf8mb4_unicode_ci AS user_name,
     a.full_name COLLATE utf8mb4_unicode_ci AS admin_name,
     h.action_type COLLATE utf8mb4_unicode_ci AS action_type,
@@ -81,6 +88,7 @@ UNION ALL
 
 SELECT
     s.software_name COLLATE utf8mb4_unicode_ci AS asset_tag,
+    u.id AS user_id,
     u.full_name COLLATE utf8mb4_unicode_ci AS user_name,
     a.full_name COLLATE utf8mb4_unicode_ci AS admin_name,
     sh.action_type COLLATE utf8mb4_unicode_ci AS action_type,
@@ -99,6 +107,9 @@ ORDER BY action_date DESC
 
 $stmt = $conn->prepare($query);
 
+$params = array_merge($laptopParams, $softwareParams);
+$types = $laptopTypes . $softwareTypes;
+
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
 }
@@ -107,31 +118,20 @@ $stmt->execute();
 
 $result = $stmt->get_result();
 
-/* =====================================================
-   CHART DATA
-===================================================== */
-
-$chartQuery = "
-    SELECT action_type, COUNT(*) AS total
-    FROM (
-        SELECT action_type
-        FROM laptop_history
-
-        UNION ALL
-
-        SELECT action_type
-        FROM software_history
-    ) AS history
-    GROUP BY action_type
-    ORDER BY total DESC
-";
-
-$chartResult = $conn->query($chartQuery);
-
+$historyRows = [];
 $chartData = [];
+$people = [];
 
-while ($row = $chartResult->fetch_assoc()) {
-    $chartData[$row['action_type']] = (int)$row['total'];
+while ($row = $result->fetch_assoc()) {
+    $historyRows[] = $row;
+
+    $action = trim((string) ($row['action_type'] ?? ''));
+    $action = $action !== '' ? $action : 'Unspecified';
+    $chartData[$action] = ($chartData[$action] ?? 0) + 1;
+
+    if ($row['user_id'] !== null) {
+        $people[$row['user_id']] = true;
+    }
 }
 
 /* =====================================================
@@ -144,156 +144,172 @@ FROM users
 WHERE role='user'
 ORDER BY full_name
 ");
+
+$userNameValue = (string) ($_GET['user_name'] ?? '');
+$fromValue = (string) ($_GET['from'] ?? '');
+$toValue = (string) ($_GET['to'] ?? '');
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Asset Assignment History</title>
+<?php layout_start('Asset history'); ?>
+
+<div class="history-page">
+<section class="hero history-hero">
+    <div class="hero-copy">
+        <div class="eyebrow">RECORDS &amp; ACTIVITY</div>
+        <h1>Asset history</h1>
+        <p>A clear record of asset and software activity, including who made each change and when.</p>
+    </div>
+    <a class="button secondary back-link" href="dashboard.php">&larr; Back to dashboard</a>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Find a record</h2>
+            <span>Filter activity by user or date range.</span>
+        </div>
+    </div>
+    <form method="GET" action="history.php" class="filter-grid">
+        <div class="filter-field">
+            <label for="user_name">User</label>
+            <input id="user_name" list="usernames" name="user_name" placeholder="Search by name" value="<?= e($userNameValue) ?>">
+            <datalist id="usernames">
+                <?php while ($user = $userList->fetch_assoc()): ?>
+                    <option value="<?= e($user['full_name'] ?? '') ?>">
+                <?php endwhile; ?>
+            </datalist>
+        </div>
+        <div class="filter-field">
+            <label for="from">From</label>
+            <input id="from" type="date" name="from" value="<?= e($fromValue) ?>">
+        </div>
+        <div class="filter-field">
+            <label for="to">To</label>
+            <input id="to" type="date" name="to" value="<?= e($toValue) ?>">
+        </div>
+        <div class="filter-actions">
+            <button type="submit">Apply filters</button>
+            <a class="reset-link" href="history.php">Clear</a>
+        </div>
+    </form>
+</section>
+
+<section class="metrics-grid history-metrics" aria-label="History summary">
+    <article class="metric-card">
+        <div class="metric-top"><span>Matching records</span><span class="metric-icon">#</span></div>
+        <strong class="metric-number"><?= count($historyRows) ?></strong>
+        <span class="metric-label">For the selected filters</span>
+    </article>
+    <article class="metric-card">
+        <div class="metric-top"><span>People involved</span><span class="metric-icon">&#9673;</span></div>
+        <strong class="metric-number"><?= count($people) ?></strong>
+        <span class="metric-label">Unique users in these records</span>
+    </article>
+    <article class="metric-card">
+        <div class="metric-top"><span>Action types</span><span class="metric-icon">&#8644;</span></div>
+        <strong class="metric-number"><?= count($chartData) ?></strong>
+        <span class="metric-label">Different actions recorded</span>
+    </article>
+</section>
+
+<div class="history-layout">
+    <section class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Activity records</h2>
+                <span><?= count($historyRows) ?> <?= count($historyRows) === 1 ? 'record' : 'records' ?></span>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset or software</th>
+                        <th>User</th>
+                        <th>Recorded by</th>
+                        <th>Action</th>
+                        <th>Date and time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($historyRows): ?>
+                        <?php foreach ($historyRows as $row): ?>
+                            <?php
+                            $actionDate = $row['action_date'] ?? '';
+                            $timestamp = $actionDate !== '' ? strtotime($actionDate) : false;
+                            $formattedDate = $timestamp !== false
+                                ? date('M j, Y, g:i a', $timestamp)
+                                : $actionDate;
+                            ?>
+                            <tr>
+                                <td><span class="asset-name"><?= e($row['asset_tag'] ?? '') ?: 'Unavailable' ?></span></td>
+                                <td><?= e($row['user_name'] ?? '') ?: '—' ?></td>
+                                <td><?= e($row['admin_name'] ?? '') ?: '—' ?></td>
+                                <td><span class="action-badge"><?= e($row['action_type'] ?? '') ?: 'Unspecified' ?></span></td>
+                                <td class="date-cell"><?= e($formattedDate) ?: '—' ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <strong>No matching activity</strong>
+                                    Try changing your filters or clear them to see all records.
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Actions overview</h2>
+                <span>Breakdown for the records shown.</span>
+            </div>
+        </div>
+        <?php if ($chartData): ?>
+            <div class="chart-wrap">
+                <canvas id="historyChart" aria-label="Chart of action types in the matching history records" role="img"></canvas>
+            </div>
+        <?php else: ?>
+            <div class="empty-state">
+                <strong>Nothing to chart yet</strong>
+                Matching action data will appear here.
+            </div>
+        <?php endif; ?>
+    </section>
+</div>
+
+<?php if ($chartData): ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f6f9;
-    margin: 2rem;
-}
-
-h1 {
-    margin-bottom: 1rem;
-}
-
-.filter-box {
-    background: #ffffff;
-    padding: 1rem;
-    border-radius: 6px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-
-.filter-box input,
-.filter-box button {
-    padding: 6px 10px;
-    margin-right: 8px;
-}
-
-.filter-box button {
-    background-color: #b08116;
-    color: #ffffff;
-    border: none;
-    cursor: pointer;
-}
-
-.filter-box button:hover {
-    background-color: #9f7004;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: #ffffff;
-}
-
-th, td {
-    padding: 10px;
-    border: 1px solid #dddddd;
-    text-align: left;
-}
-
-th {
-    background:linear-gradient(to right,#b08116,#99bb4f);
-    color: #ffffff;
-}
-
-.chart-container {
-    width: 500px;
-    margin-top: 30px;
-}
-</style>
-</head>
-
-<body>
-
-<h1>Asset Assignment History</h1>
-
-<!-- ================= FILTER SECTION ================= -->
-<div class="filter-box">
-<form method="GET">
-
-<label>User:</label>
-<input list="usernames"
-       name="user_name"
-       placeholder="Type or select user..."
-       value="<?= htmlspecialchars($_GET['user_name'] ?? '') ?>">
-
-<datalist id="usernames">
-<?php while($u = $userList->fetch_assoc()): ?>
-<option value="<?= htmlspecialchars($u['full_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-<?php endwhile; ?>
-</datalist>
-
-<label>From:</label>
-<input type="date" name="from" value="<?= htmlspecialchars($_GET['from'] ?? '') ?>">
-
-<label>To:</label>
-<input type="date" name="to" value="<?= htmlspecialchars($_GET['to'] ?? '') ?>">
-
-<button type="submit">Apply Filter</button>
-<a href="history.php">Reset</a>
-
-</form>
-</div>
-
-<!-- ================= HISTORY TABLE ================= -->
-<table>
-<thead>
-<tr>
-    <th>Asset Tag</th>
-    <th>User</th>
-    <th>Admin</th>
-    <th>Action</th>
-    <th>Date</th>
-</tr>
-</thead>
-<tbody>
-<?php if($result->num_rows > 0): ?>
-    <?php while($row = $result->fetch_assoc()): ?>
-    <tr>
-        <td><?= htmlspecialchars($row['asset_tag'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-        <td><?= htmlspecialchars($row['user_name'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-        <td><?= htmlspecialchars($row['admin_name'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-        <td><?= htmlspecialchars($row['action_type'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-        <td><?= htmlspecialchars($row['action_date'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-    </tr>
-    <?php endwhile; ?>
-<?php else: ?>
-<tr>
-    <td colspan="5" style="text-align:center;">No records found.</td>
-</tr>
-<?php endif; ?>
-</tbody>
-</table>
-
-<!-- ================= CHART SECTION ================= -->
-<div class="chart-container">
-<canvas id="historyChart"></canvas>
-</div>
-
 <script>
-const ctx = document.getElementById('historyChart');
-
-new Chart(ctx, {
+new Chart(document.getElementById('historyChart'), {
     type: 'pie',
     data: {
-        labels: <?= json_encode(array_keys($chartData)) ?>,
+        labels: <?= json_encode(array_keys($chartData), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
         datasets: [{
             data: <?= json_encode(array_values($chartData)) ?>,
-            backgroundColor: ['#2c7be5','#00d97e','#e63757','#f6c343','#6f42c1']
+            backgroundColor: ['#b08116', '#99bb4f', '#2778c8', '#dc7b45', '#718f32', '#8b79b6'],
+            borderColor: '#ffffff',
+            borderWidth: 3
         }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { usePointStyle: true, padding: 16, boxWidth: 8 }
+            }
+        }
     }
 });
 </script>
-
-</body>
-</html>
+<?php endif; ?>
+</div>
+<?php layout_end(); ?>
