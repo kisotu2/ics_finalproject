@@ -2,14 +2,21 @@
 require 'db.php';
 $response = ['success'=>false,'message'=>'','id'=>null];
 
+$category = $_POST['category'] ?? '';
+if ($category === 'Laptop') {
+    http_response_code(410);
+    $response['message'] = 'Laptop registration is available only through Active Directory sync.';
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($response);
+    exit;
+}
+
 $asset_tag = trim($_POST['asset_tag']);
 $serial = trim($_POST['serial_number']);
 $brand = $_POST['brand'];
 $model = $_POST['model'];
 $status = $_POST['status'];
-$category = $_POST['category'];
-
-$tables = ['Laptop'=>'laptops','Phone'=>'phones','Desktop'=>'desktops'];
+$tables = ['Phone'=>'phones','Desktop'=>'desktops'];
 if(!isset($tables[$category])){
     $response['message'] = 'Invalid category';
     echo json_encode($response); exit;

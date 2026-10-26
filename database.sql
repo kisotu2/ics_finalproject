@@ -23,18 +23,40 @@ CREATE TABLE IF NOT EXISTS laptops (
     id INT AUTO_INCREMENT PRIMARY KEY,
     asset_tag VARCHAR(80) NOT NULL UNIQUE,
     serial_number VARCHAR(120) NOT NULL UNIQUE,
+    manufacturer_serial VARCHAR(120) NULL,
+    ad_object_guid CHAR(36) NULL,
+    ad_computer_name VARCHAR(63) NULL,
+    ad_distinguished_name VARCHAR(1024) NULL,
+    ad_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    ad_operating_system VARCHAR(255) NULL,
+    ad_operating_system_version VARCHAR(100) NULL,
+    ad_last_synced_at DATETIME(6) NULL,
     brand VARCHAR(100) NOT NULL,
     model VARCHAR(120) NOT NULL,
     department VARCHAR(120) NULL,
     processor_tier ENUM('Standard','Performance','Workstation') NOT NULL DEFAULT 'Standard',
-    ram_gb TINYINT UNSIGNED NOT NULL DEFAULT 8,
-    storage_gb SMALLINT UNSIGNED NOT NULL DEFAULT 256,
+    processor_description VARCHAR(255) NULL,
+    ram_gb TINYINT UNSIGNED NULL DEFAULT NULL,
+    storage_gb SMALLINT UNSIGNED NULL DEFAULT NULL,
     assigned_to INT NULL,
     status ENUM('Available','Assigned','Maintenance','Retired','Disposed') NOT NULL DEFAULT 'Available',
     purchase_date DATE NULL,
     warranty_expiry DATE NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_laptops_ad_object_guid (ad_object_guid),
     CONSTRAINT fk_laptop_user FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS ad_sync_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    source_ip VARCHAR(45) NOT NULL,
+    received_count INT UNSIGNED NOT NULL DEFAULT 0,
+    created_count INT UNSIGNED NOT NULL DEFAULT 0,
+    updated_count INT UNSIGNED NOT NULL DEFAULT 0,
+    failed_count INT UNSIGNED NOT NULL DEFAULT 0,
+    summary JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ad_sync_events_created_at (created_at)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS softwares (

@@ -20,8 +20,12 @@ function recommendation_score(array $laptop, array $need, string $department): i
     $tierPoints = ['Standard' => 1, 'Performance' => 2, 'Workstation' => 3];
     $score = 0;
     $score += ($laptop['department'] === '' || $laptop['department'] === $department) ? 25 : 10;
-    $score += min(35, max(0, ((int)$laptop['ram_gb'] - $need['ram'] + 8) * 4));
-    $score += min(25, max(0, ((int)$laptop['storage_gb'] - $need['storage'] + 128) / 16));
+    if ($laptop['ram_gb'] !== null) {
+        $score += min(35, max(0, ((int)$laptop['ram_gb'] - $need['ram'] + 8) * 4));
+    }
+    if ($laptop['storage_gb'] !== null) {
+        $score += min(25, max(0, ((int)$laptop['storage_gb'] - $need['storage'] + 128) / 16));
+    }
     $score += (($tierPoints[$laptop['processor_tier']] ?? 1) >= ($tierPoints[$need['tier']] ?? 1)) ? 15 : 0;
     return min(100, (int)$score);
 }
@@ -53,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $conn->query("SELECT id, full_name, department, organisation_rank FROM users WHERE role = 'user' AND status = 'active' ORDER BY full_name")->fetch_all(MYSQLI_ASSOC);
-$laptops = $conn->query("SELECT id, asset_tag, brand, model, department, processor_tier, ram_gb, storage_gb FROM laptops WHERE status = 'Available' ORDER BY created_at ASC")->fetch_all(MYSQLI_ASSOC);
+$laptops = $conn->query("SELECT id, asset_tag, brand, model, department, processor_tier, processor_description, ram_gb, storage_gb FROM laptops WHERE status = 'Available' ORDER BY created_at ASC")->fetch_all(MYSQLI_ASSOC);
 $selectedUser = (int) ($_GET['user_id'] ?? 0);
 $department = trim($_GET['department'] ?? ''); $rank = trim($_GET['rank'] ?? ''); $workType = trim($_GET['work_type'] ?? '');
 $recommendations = [];
@@ -71,4 +75,4 @@ layout_start('Needs-based laptop assignment');
 <label>Organisational rank<select name="rank" required><option value="">Select rank</option><?php foreach (['Staff','Officer','Manager','Senior manager','Director'] as $option): ?><option <?= $rank===$option?'selected':'' ?>><?= e($option) ?></option><?php endforeach; ?></select></label>
 <label>Primary work<select name="work_type" required><option value="">Select work</option><?php foreach (['Administration','Finance','Development','Design','Data analysis'] as $option): ?><option <?= $workType===$option?'selected':'' ?>><?= e($option) ?></option><?php endforeach; ?></select></label>
 <div><button>Find suitable laptops</button></div></form></section>
-<?php if ($recommendations): $need = profile_for($rank, $workType); ?><section class="panel" style="margin-top:24px"><h2>Recommended profile</h2><p class="muted">Minimum target: <?= e($need['tier']) ?> processor, <?= $need['ram'] ?> GB RAM and <?= $need['storage'] ?> GB storage. Scores favour adequate specifications and a department match.</p><table><thead><tr><th>Suitability</th><th>Asset</th><th>Specification</th><th>Department</th><th>Assign</th></tr></thead><tbody><?php foreach ($recommendations as $laptop): ?><tr><td><strong><?= $laptop['score'] ?>%</strong></td><td><?= e($laptop['asset_tag']) ?><br><small><?= e($laptop['brand'].' '.$laptop['model']) ?></small></td><td><?= e($laptop['processor_tier']) ?> · <?= (int)$laptop['ram_gb'] ?> GB RAM · <?= (int)$laptop['storage_gb'] ?> GB</td><td><?= e($laptop['department'] ?: 'Unallocated') ?></td><td><form method="post"><input type="hidden" name="csrf" value="<?= csrf() ?>"><input type="hidden" name="user_id" value="<?= $selectedUser ?>"><input type="hidden" name="laptop_id" value="<?= $laptop['id'] ?>"><input type="hidden" name="department" value="<?= e($department) ?>"><input type="hidden" name="organisation_rank" value="<?= e($rank) ?>"><input type="hidden" name="work_type" value="<?= e($workType) ?>"><button>Assign this laptop</button></form></td></tr><?php endforeach; ?></tbody></table></section><?php endif; layout_end();
+<?php if ($recommendations): $need = profile_for($rank, $workType); ?><section class="panel" style="margin-top:24px"><h2>Recommended profile</h2><p class="muted">Minimum target: <?= e($need['tier']) ?> processor, <?= $need['ram'] ?> GB RAM and <?= $need['storage'] ?> GB storage. Unreported RAM or storage does not earn specification points.</p><table><thead><tr><th>Suitability</th><th>Asset</th><th>Specification</th><th>Department</th><th>Assign</th></tr></thead><tbody><?php foreach ($recommendations as $laptop): ?><tr><td><strong><?= $laptop['score'] ?>%</strong></td><td><?= e($laptop['asset_tag']) ?><br><small><?= e($laptop['brand'].' '.$laptop['model']) ?></small></td><td><?= e($laptop['processor_description'] ?: $laptop['processor_tier']) ?> · <?= $laptop['ram_gb'] !== null ? (int)$laptop['ram_gb'].' GB RAM' : 'RAM not reported' ?> · <?= $laptop['storage_gb'] !== null ? (int)$laptop['storage_gb'].' GB storage' : 'Storage not reported' ?></td><td><?= e($laptop['department'] ?: 'Unallocated') ?></td><td><form method="post"><input type="hidden" name="csrf" value="<?= csrf() ?>"><input type="hidden" name="user_id" value="<?= $selectedUser ?>"><input type="hidden" name="laptop_id" value="<?= $laptop['id'] ?>"><input type="hidden" name="department" value="<?= e($department) ?>"><input type="hidden" name="organisation_rank" value="<?= e($rank) ?>"><input type="hidden" name="work_type" value="<?= e($workType) ?>"><button>Assign this laptop</button></form></td></tr><?php endforeach; ?></tbody></table></section><?php endif; layout_end();

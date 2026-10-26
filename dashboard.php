@@ -8,32 +8,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         flash('Use the needs-based laptop assignment page to select a suitable laptop.', 'error');
         header('Location: laptop_assignment.php'); exit;
     }
-    if ($action==='asset') { $tag=trim($_POST['asset_tag']);
-    $serial=trim($_POST['serial_number']);
-    $brand=trim($_POST['brand']);
-    $model=trim($_POST['model']);
-    $dept=trim($_POST['department']);
-    $purchase=$_POST['purchase_date']?:null;
-    $warranty=$_POST['warranty_expiry']?:null; 
-    try{$s=$conn->prepare("INSERT INTO laptops(asset_tag,serial_number,brand,model,department,purchase_date,warranty_expiry) VALUES(?,?,?,?,?,?,?)");
-    $s->bind_param('sssssss',$tag,$serial,$brand,$model,$dept,$purchase,$warranty);
-    $s->execute();
-
-$assetId = $conn->insert_id;
-
-audit($conn, 'asset_created', 'laptop', $assetId);
-
-$history = $conn->prepare("
-    INSERT INTO laptop_history
-    (laptop_id, user_id, admin_id, action_type, action_date)
-    VALUES (?, NULL, ?, 'Asset Registered', NOW())
-");
-$history->bind_param('ii', $assetId, $_SESSION['user_id']);
-$history->execute();
-
-flash('Asset registered.');
-    }catch(mysqli_sql_exception){flash('Asset tag and serial number must be unique.','error');
-    }
+    if ($action === 'asset') {
+        flash('Laptop inventory is registered through Active Directory sync.', 'error');
+        header('Location: directory_sync.php');
+        exit;
     }
     if ($action === 'assign') {
 
@@ -280,17 +258,15 @@ layout_start('Dashboard'); ?><div class="hero">
 <?php if($admin): ?>
     <section class="split" style="margin-top:24px">
         <div class="panel">
-            <h2>Register asset</h2>
-            <form method="post">
-                <input type="hidden" name="csrf" value="<?=csrf()?>">
-                <input type="hidden" name="action" value="asset">
-                <label>Asset tag<input name="asset_tag" required></label>
-                <label>Serial number<input name="serial_number" required></label>
-                <label>Brand<input name="brand" required></label>
-                <label>Model<input name="model" required></label>
-                <label>Department<input name="department"></label>
-                <label>Purchase date<input type="date" name="purchase_date"></label>
-                <label>Warranty expiry<input type="date" name="warranty_expiry"></label>
-                <button>Register asset</button>
-            </form></div><div class="panel"><h2>Maintenance intelligence</h2><p>Assets with unresolved repairs, expired warranties, or repeated repairs are prioritised in the maintenance view.</p><a class="button secondary" href="maintenance.php">Manage maintenance</a></div></section><?php endif; ?>
-<section style="margin-top:24px"><h2><?= $admin?'Asset register':'My assigned assets'?></h2><table><thead><tr><th>Tag</th><th>Device</th><th>Status</th><th>Assigned to</th><?php if($admin):?><th>Risk</th><th>Actions</th><?php endif;?></tr></thead><tbody><?php while($a=$assets->fetch_assoc()):?><tr><td><b><?=e($a['asset_tag'])?></b><br><small><?=e($a['serial_number'])?></small></td><td><?=e($a['brand'].' '.$a['model'])?><br><small><?=e($a['department'])?></small></td><td><?=e($a['status'])?></td><td><?=e($a['full_name']??($_SESSION['name']??'Unassigned'))?></td><?php if($admin):?><td><?=($a['open_repairs']??0)>0?'Needs attention':'Normal'?></td><td><?php if($a['status']==='Available'):?><form method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="assign"><input type="hidden" name="asset_id" value="<?=$a['id']?>"><select name="user_id" required><option value="">Assign to…</option><?php $users->data_seek(0);while($u=$users->fetch_assoc()):?><option value="<?=$u['id']?>"><?=e($u['full_name'])?></option><?php endwhile;?></select><button>Assign</button></form><?php endif;?><form method="post" style="margin-top:6px"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="status"><input type="hidden" name="asset_id" value="<?=$a['id']?>"><select name="status"><option>Available</option><option>Maintenance</option><option>Retired</option><option>Disposed</option></select><button class="secondary">Update</button></form></td><?php endif;?></tr><?php endwhile;?></tbody></table></section><?php layout_end();
+            <h2>Directory inventory</h2>
+            <p class="muted">Register and refresh laptop hardware from the authorized Active Directory connector.</p>
+            <a class="button" href="directory_sync.php">Open directory sync</a>
+        </div>
+        <div class="panel">
+            <h2>Maintenance intelligence</h2>
+            <p>Assets with unresolved repairs, expired warranties, or repeated repairs are prioritised in the maintenance view.</p>
+            <a class="button secondary" href="maintenance.php">Manage maintenance</a>
+        </div>
+    </section>
+<?php endif; ?>
+<section style="margin-top:24px"><h2><?= $admin?'Asset register':'My assigned assets'?></h2><table><thead><tr><th>Tag</th><th>Device</th><th>Status</th><th>Assigned to</th><?php if($admin):?><th>Risk</th><th>Actions</th><?php endif;?></tr></thead><tbody><?php while($a=$assets->fetch_assoc()):?><tr><td><b><?=e($a['asset_tag'])?></b><br><small>Inventory: <?=e($a['serial_number'])?><br>Manufacturer: <?=e($a['manufacturer_serial']??'Not reported')?></small></td><td><?=e($a['brand'].' '.$a['model'])?><br><small><?=e($a['department'])?></small></td><td><?=e($a['status'])?></td><td><?=e($a['full_name']??($_SESSION['name']??'Unassigned'))?></td><?php if($admin):?><td><?=($a['open_repairs']??0)>0?'Needs attention':'Normal'?></td><td><?php if($a['status']==='Available'):?><form method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="assign"><input type="hidden" name="asset_id" value="<?=$a['id']?>"><select name="user_id" required><option value="">Assign to…</option><?php $users->data_seek(0);while($u=$users->fetch_assoc()):?><option value="<?=$u['id']?>"><?=e($u['full_name'])?></option><?php endwhile;?></select><button>Assign</button></form><?php endif;?><form method="post" style="margin-top:6px"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="status"><input type="hidden" name="asset_id" value="<?=$a['id']?>"><select name="status"><option>Available</option><option>Maintenance</option><option>Retired</option><option>Disposed</option></select><button class="secondary">Update</button></form></td><?php endif;?></tr><?php endwhile;?></tbody></table></section><?php layout_end();

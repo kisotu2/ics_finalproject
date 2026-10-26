@@ -3,7 +3,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/bootstrap.php';
+require_login(['admin', 'super_admin']);
+require_once __DIR__ . '/backend/asset_dates.php';
 
 $csvFile = __DIR__ . '/ira_100_device_maintenance_dataset.csv';
 
@@ -81,11 +83,26 @@ try {
             continue;
         }
 
-        /*
-         * Check whether this asset already exists.
-         */
+        try {
+            $purchaseDate = validate_purchase_date(trim($row['purchase_date']));
+            $warrantyDate = validate_warranty_expiry(trim($row['warranty_expiry']));
+        } catch (InvalidArgumentException $exception) {
+            $skipped++;
+            $errors[] = 'Row for ' . $assetTag . ': ' . $exception->getMessage();
+            continue;
+        }
+
+        if ($purchaseDate === null || $warrantyDate === null) {
+            $skipped++;
+            $errors[] = 'Row for ' . $assetTag . ': valid purchase and warranty dates are required for training import.';
+            continue;
+        }
+
         $check = $conn->prepare(
-            "SELECT id FROM laptops WHERE asset_tag = ? LIMIT 1"
+            "SELECT id, purchase_date
+             FROM laptops
+             WHERE asset_tag = ? AND ad_object_guid IS NOT NULL
+             LIMIT 1"
         );
 
         $check->bind_param('s', $assetTag);
@@ -93,48 +110,18 @@ try {
 
         $existing = $check->get_result()->fetch_assoc();
 
-        if ($existing) {
+        if (!$existing) {
             $skipped++;
+            $errors[] = 'Row for ' . $assetTag . ': sync this computer from Active Directory before importing training data.';
             continue;
         }
 
-        /*
-         * Generate a unique serial number.
-         */
-        $serialNumber = 'IRA-SN-' . $assetTag;
-
-        /*
-         * Insert laptop.
-         */
-        $stmt = $conn->prepare("
-            INSERT INTO laptops
-            (
-                asset_tag,
-                serial_number,
-                brand,
-                model,
-                department,
-                status,
-                purchase_date,
-                warranty_expiry
-            )
-            VALUES (?, ?, ?, ?, ?, 'Available', ?, ?)
-        ");
-
-        $stmt->bind_param(
-            'sssssss',
-            $assetTag,
-            $serialNumber,
-            $row['brand'],
-            $row['model'],
-            $row['department'],
-            $row['purchase_date'],
-            $row['warranty_expiry']
-        );
-
-        $stmt->execute();
-
-        $laptopId = $conn->insert_id;
+        $laptopId = (int) $existing['id'];
+        if ($existing['purchase_date'] === null) {
+            $setPurchaseDate = $conn->prepare('UPDATE laptops SET purchase_date = ? WHERE id = ?');
+            $setPurchaseDate->bind_param('si', $purchaseDate, $laptopId);
+            $setPurchaseDate->execute();
+        }
 
         /*
          * Insert maintenance history.
@@ -326,16 +313,16 @@ try {
         /*
          * Calculate the ML features.
          */
-        $purchaseDate = new DateTime($row['purchase_date']);
+        $purchaseDateObject = new DateTime($purchaseDate);
         $today = new DateTime();
 
-        $ageDays = $purchaseDate->diff($today)->days;
+        $ageDays = $purchaseDateObject->diff($today)->days;
         $assetAgeYears = round($ageDays / 365.25, 2);
 
-        $warrantyDate = new DateTime($row['warranty_expiry']);
+        $warrantyDateObject = new DateTime($warrantyDate);
 
         $warrantyDays = (int)$today->diff(
-            $warrantyDate
+            $warrantyDateObject
         )->format('%r%a');
 
         $failed = (int)$row['failed_within_90_days'];
@@ -449,6 +436,20 @@ fclose($handle);
     <p class="warning">
         <?= $skipped ?> records skipped.
     </p>
+
+    <?php if ($errors): ?>
+        <details>
+            <summary>Review skipped rows</summary>
+            <ul>
+                <?php foreach (array_slice($errors, 0, 20) as $error): ?>
+                    <li><?= e($error) ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <?php if (count($errors) > 20): ?>
+                <p><?= count($errors) - 20 ?> additional messages omitted.</p>
+            <?php endif; ?>
+        </details>
+    <?php endif; ?>
 
     <hr>
 

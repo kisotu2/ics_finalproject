@@ -52,7 +52,7 @@ $history_stmt = $conn->prepare("
 ");
 $history_stmt->bind_param("i", $asset_id);
 $history_stmt->execute();
-$history = $history_stmt->get_result();x
+$history = $history_stmt->get_result();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -86,6 +86,10 @@ h3{color:#b08116;}
 <h2><?= htmlspecialchars($asset['asset_tag']) ?> (<?= ucfirst($category) ?>)</h2>
 <p><b>Brand:</b> <?= htmlspecialchars($asset['brand']) ?></p>
 <p><b>Model:</b> <?= htmlspecialchars($asset['model']) ?></p>
+<?php if ($category === 'laptop'): ?>
+<p><b>Inventory serial:</b> <?= htmlspecialchars($asset['serial_number'] ?? 'Not recorded') ?></p>
+<p><b>Manufacturer serial:</b> <?= htmlspecialchars($asset['manufacturer_serial'] ?? 'Not reported') ?></p>
+<?php endif; ?>
 <p><b>Status:</b> 
 <span class="badge <?= !empty($asset['assigned_to']) ? 'issued':'available' ?>">
 <?= !empty($asset['assigned_to']) ? 'Issued':'Available' ?>

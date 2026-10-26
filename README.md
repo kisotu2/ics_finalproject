@@ -19,9 +19,11 @@ A web-based ICT asset management application designed to help organisations main
 - [Requirements](#requirements)
 - [Installation and Setup](#installation-and-setup)
 - [Database Migrations](#database-migrations)
+- [Active Directory Laptop Inventory](#active-directory-laptop-inventory)
 - [Running the Flask API](#running-the-flask-api)
 - [Training the Model](#training-the-model)
 - [Security Considerations](#security-considerations)
+- [Release Archive Contents](#release-archive-contents)
 - [Testing and Evaluation](#testing-and-evaluation)
 - [Development Workflow](#development-workflow)
 - [Limitations and Future Improvements](#limitations-and-future-improvements)
@@ -190,7 +192,7 @@ A prediction probability for an individual asset is not the same as the model's 
 Before installation, prepare the following:
 
 - XAMPP with Apache and MySQL enabled.
-- PHP with the required database extensions.
+- PHP 8.0 or newer with `mysqli`, `mbstring` and JSON support enabled.
 - Python 3 and `pip`.
 - The Python packages listed in `requirements.txt`.
 - A web browser.
@@ -249,7 +251,13 @@ Do not import the base schema and all migrations indiscriminately into an existi
 
 Check the application's database configuration files and identify the configuration format required by the current version.
 
-The repository's `.gitignore` excludes `config.php`, environment files and selected local credentials. Create the necessary local configuration using your own database settings and mail credentials.
+The repository's `.gitignore` excludes `config.php`, environment files and selected local credentials. Start from the safe `config.example.php` template:
+
+```bash
+cp config.example.php config.php
+```
+
+Replace the placeholder values with local settings. Database values can instead be supplied through `ASSET_DB_HOST`, `ASSET_DB_NAME`, `ASSET_DB_USER` and `ASSET_DB_PASSWORD`. Do not commit the resulting `config.php`.
 
 **Important:** Do not copy real passwords, SMTP credentials, API tokens or private credentials into tracked source files.
 
@@ -294,6 +302,123 @@ Before applying a migration:
 5. Apply the migration and verify the resulting schema.
 
 Migration filenames are provided as references; their existence and compatibility must be confirmed against the current branch.
+
+### XAMPP migration and initial setup
+
+For a fresh installation, import `database.sql`, create local configuration from `config.example.php`, install Composer packages with `composer install`, and complete the administrator setup. The fresh schema includes the Active Directory inventory fields.
+
+For an existing installation:
+
+1. Back up the configured database.
+2. Confirm the database contains the `laptops` table and has already received the other migrations required by this version.
+3. Apply `migrations/20261026_active_directory_inventory.sql` once using phpMyAdmin or the MySQL CLI, selecting the application's configured database. The migration uses `USE ira_assets`; if your configured database has another name, change that statement to the database you backed up.
+4. Verify `laptops.ad_object_guid`, `laptops.manufacturer_serial`, `laptops.processor_description` and `ad_sync_events` exist before running the connector.
+5. Test migration and sync behavior in a staging copy before applying to production.
+
+The migration copies existing non-`IRA-LAP-` serial values into `manufacturer_serial`, then assigns database-ID-based internal serials to existing laptop rows. Manufacturer serials are deliberately not unique because endpoint data can be missing or duplicated.
+
+## Active Directory Laptop Inventory
+
+The PHP application does not read Microsoft Active Directory directly. It accepts records from `scripts/Sync-ActiveDirectoryInventory.ps1`, an authorized connector intended to run on a domain-joined Windows host.
+
+### What is collected
+
+The connector reads the AD computer object's GUID, computer name, distinguished name, enabled state, and AD operating-system metadata with the Active Directory PowerShell module. For each reachable computer, it uses PowerShell remoting and CIM to query manufacturer, model, BIOS serial, processor, RAM and physical storage. Active Directory commonly does **not** contain these current hardware properties.
+
+Endpoint queries require administrator-approved remote management, appropriate least-privilege account permissions, WinRM/CIM configuration, and firewall rules on the endpoints. The connector reports unreachable computers and omits them from that run; an offline result does not delete or retire the existing inventory record.
+
+The connector does not infer a purchase date from AD object timestamps. Purchase dates remain unknown unless a trusted date is supplied in a validated payload or through the controlled training-data import. Warranty expiry may be in the future; a purchase/acquisition date may not.
+
+### Send one laptop from that laptop
+
+For an enrolled, domain-joined Windows laptop, an administrator can provide `scripts/Send-ThisLaptopInventory.ps1` and the HTTPS endpoint URL. The script looks up that laptop's own AD computer object, reads hardware locally, and sends one record to the same ingestion endpoint. It requires the Active Directory PowerShell module, network access to the domain, and an `AD_SYNC_TOKEN` supplied to the process through an approved secret-management or device-management method.
+
+Run it from PowerShell on the laptop:
+
+```powershell
+.\Send-ThisLaptopInventory.ps1 `
+  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php'
+```
+
+The script requires HTTPS and sends immediately; it does not save the token or hardware payload to disk. Do not add a token to the script, share a token through email/chat, or expose the shared ingestion token to untrusted users. Restrict who can run the script and provision its token through managed deployment. A computer that is not joined to the directory, or whose AD object cannot be read, cannot be submitted through this AD-GUID-keyed endpoint.
+
+### Secure endpoint configuration
+
+The ingestion endpoint is:
+
+```text
+POST /ics_finalproject/ad_sync_api.php
+```
+
+It requires HTTPS, an `Authorization: Bearer <token>` header, `Content-Type: application/json`, payloads no larger than 2 MiB, and 1–500 computer records. The token is read only from the PHP server environment variable `AD_SYNC_TOKEN`; the PHP endpoint rejects an unset or shorter-than-32-character token. Generate a high-entropy value locally, for example:
+
+```bash
+openssl rand -base64 48
+```
+
+Configure the same generated value as an environment variable for Apache/PHP and for the authorized connector process, using the operating system's protected secret-management mechanism. Do not paste it into project files, shell history, a URL, logs, or the connector script. For XAMPP, Apache may need to be restarted after changing its environment. Keep local configuration files private and outside source control.
+
+At the network layer, restrict the endpoint to the connector's fixed source address and configure TLS. An Apache 2.4 example is provided in `docs/apache-ad-sync-location.conf.example`; replace its documentation-only IP address with the actual trusted connector address and install it in the applicable VirtualHost. Also restrict the path using the host firewall. Do not expose this endpoint to the public Internet.
+
+For local-only XAMPP development, HTTP is accepted solely from `127.0.0.1` or `::1` when `AD_SYNC_ALLOW_INSECURE_LOCAL=1` is set. This development exception is not appropriate for a domain connector or production deployment.
+
+### Preview and send
+
+On the domain-joined Windows host, open PowerShell with the Active Directory module installed. Use an OU distinguished name scoped to the computers approved for inventory:
+
+```powershell
+.\scripts\Sync-ActiveDirectoryInventory.ps1 `
+  -SearchBase 'OU=Workstations,DC=example,DC=com' `
+  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php'
+```
+
+The default is preview-only; it queries online hardware and reports offline computers but sends nothing. After reviewing the preview and confirming the network/TLS configuration, expose the token to that connector process through its protected environment and explicitly send:
+
+```powershell
+.\scripts\Sync-ActiveDirectoryInventory.ps1 `
+  -SearchBase 'OU=Workstations,DC=example,DC=com' `
+  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php' `
+  -Send
+```
+
+The connector sends batches of up to 100 records. A JSON record has this shape:
+
+```json
+{
+  "version": 1,
+  "computers": [{
+    "ad_guid": "a6f33f8b-f62d-4acb-96be-8e1ef6ab0c21",
+    "computer_name": "WS-ACCOUNTING-01",
+    "distinguished_name": "CN=WS-ACCOUNTING-01,OU=Workstations,DC=example,DC=com",
+    "enabled": true,
+    "operating_system": "Windows 11 Enterprise",
+    "operating_system_version": "10.0.26100",
+    "manufacturer": "Example manufacturer",
+    "model": "Example model",
+    "manufacturer_serial": null,
+    "processor": "Example processor",
+    "ram_gb": 16,
+    "storage_gb": 512,
+    "purchase_date": null,
+    "warranty_expiry": null
+  }]
+}
+```
+
+The example is illustrative; its values are not a claim about an actual device. Repeated sends update the same laptop by AD object GUID. Each laptop's `serial_number` is generated from its database ID (`IRA-LAP-000123`, with a deterministic collision suffix if needed); the BIOS serial remains separate in nullable, non-unique `manufacturer_serial`. Empty hardware values are preserved as unknown, not invented. The response reports created, updated and failed records plus missing/duplicate manufacturer serials. Sync events are stored in `ad_sync_events`; record-level failures are also written to the PHP server log without recording the bearer token.
+
+Administrators can view migration/token/transport status and setup limitations at `directory_sync.php`. The page does not run the connector or expose the secret. Manual laptop registration and legacy laptop AJAX creation are disabled; viewing, assignment, maintenance and reporting remain available.
+
+### AD sync tests
+
+Run the dependency-free validation tests with:
+
+```bash
+php tests/ad_sync_validation_test.php
+bash tests/ad_sync_http_test.sh
+```
+
+The HTTP boundary test starts a temporary localhost PHP server and checks invalid/missing tokens, malformed JSON, missing fields, and a future purchase date. Database idempotency/serial-collision, production HTTPS, unauthorized-page, and Windows endpoint scenarios are listed in [`tests/AD_SYNC_TEST_PLAN.md`](tests/AD_SYNC_TEST_PLAN.md); they require an isolated test database and/or a configured Windows domain. Do not run them against production.
 
 ## Running the Flask API
 
@@ -428,6 +553,10 @@ Security is important because the application stores asset information and suppo
 - Review GitHub secret-scanning and repository security settings where available.
 
 Ignoring a file through `.gitignore` does not remove it if it was committed previously. If a credential has been exposed, revoke or rotate it and follow the appropriate repository-cleanup process.
+
+## Release Archive Contents
+
+The distributable ZIP includes the application source, Composer dependencies, database schema and migrations, connector, tests, documentation and existing machine-learning assets. It excludes local configuration and OAuth credential/token files, local database files, Python caches/virtual environments, temporary office files, and optional demo seed files that contain demo credentials or non-AD laptop fixtures. Create `config.php` from `config.example.php` and configure secrets through protected environment variables after extraction.
 
 ## Testing and Evaluation
 

@@ -131,19 +131,24 @@ if(isset($_POST['add_asset'])){
     $category = $_POST['category'];
     $assigned_to = NULL;
 
-    // Check if asset exists
-    $check = $conn->prepare("SELECT id FROM assets WHERE asset_tag=? OR serial_number=?");
-    $check->bind_param("ss", $asset_tag, $serial);
-    $check->execute();
-    $check->store_result();
-
-    if($check->num_rows > 0){
-        $message = "⚠️ Asset already exists (duplicate tag or serial)!";
+    if ($category === 'Laptop') {
+        $message = 'Laptop inventory must be registered through Active Directory sync.';
+    } elseif (!in_array($category, ['Phone', 'Desktop'], true)) {
+        $message = 'Invalid asset category.';
     } else {
-        $stmt = $conn->prepare("INSERT INTO assets(asset_tag,serial_number,brand,model,status,category,assigned_to) VALUES(?,?,?,?,?,?,?)");
-        $stmt->bind_param("ssssssi", $asset_tag, $serial, $brand, $model, $status, $category, $assigned_to);
-        $stmt->execute();
-        $message = "✅ Asset added successfully!";
+        $check = $conn->prepare("SELECT id FROM assets WHERE asset_tag=? OR serial_number=?");
+        $check->bind_param("ss", $asset_tag, $serial);
+        $check->execute();
+        $check->store_result();
+
+        if($check->num_rows > 0){
+            $message = "⚠️ Asset already exists (duplicate tag or serial)!";
+        } else {
+            $stmt = $conn->prepare("INSERT INTO assets(asset_tag,serial_number,brand,model,status,category,assigned_to) VALUES(?,?,?,?,?,?,?)");
+            $stmt->bind_param("ssssssi", $asset_tag, $serial, $brand, $model, $status, $category, $assigned_to);
+            $stmt->execute();
+            $message = "✅ Asset added successfully!";
+        }
     }
 }
 ?>
@@ -382,12 +387,13 @@ function filterAssets(type){
                 <option value="Retired">Retired</option>
             </select>
             <select name="category" required>
-                <option value="Laptop">Laptop</option>
+                <option value="Laptop" disabled>Laptop — use directory sync</option>
                 <option value="Phone">Phone</option>
                 <option value="Desktop">Desktop</option>
             </select>
             <button type="submit">Add Asset</button>
         </form>
+        <p><a href="directory_sync.php">Register or refresh laptops through Active Directory</a></p>
         <p id="assetMessage" style="font-weight:bold;margin-top:5px;"></p>
     </div>
 
@@ -435,8 +441,9 @@ document.getElementById('addAssetForm').addEventListener('submit', function(e){
     e.preventDefault();
     let formData = new FormData(this);
     fetch('add_asset_ajax.php', { method:'POST', body:formData })
-        .then(res => res.json())
-        .then(data => {
+        .then(async res => ({ response: res, data: await res.json() }))
+        .then(({ response, data }) => {
+            if (!response.ok && !data.message) throw new Error('Asset could not be added.');
             const msg = document.getElementById('assetMessage');
             msg.textContent = data.message;
             msg.style.color = data.success ? 'green' : 'red';
@@ -463,6 +470,10 @@ tr.innerHTML = `
 table.appendChild(tr);
                 this.reset();
             }
+        })
+        .catch(error => {
+            document.getElementById('assetMessage').textContent = error.message;
+            document.getElementById('assetMessage').style.color = 'red';
         });
 });
 </script>

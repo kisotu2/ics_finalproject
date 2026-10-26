@@ -1,0 +1,7 @@
+# Replace 192.0.2.25 with the connector's fixed, trusted source address.
+# Put this inside the relevant Apache VirtualHost configuration and reload Apache.
+<LocationMatch "^/ics_finalproject/ad_sync_api\.php$">
+    Require ip 192.0.2.25
+</LocationMatch>
+
+# Configure TLS for that same VirtualHost. Do not expose the endpoint over plain HTTP.
