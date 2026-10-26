@@ -1,3 +1,24 @@
 config.php
 vendor/
 .DS_Store
+
+# Local credentials and OAuth tokens
+scripts/credentials.json
+scripts/token.json
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+.venv/
+.venv-drive/
+__pycache__/
+*.py[cod]
+
+# Local OAuth credentials
+scripts/credentials.json
+scripts/token.json
+google_config.local.php
+.env
+.env.*
+!.env.example

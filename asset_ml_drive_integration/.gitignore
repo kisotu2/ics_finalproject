@@ -1,0 +1,6 @@
+# OAuth credentials and local tokens must never be committed
+scripts/credentials.json
+scripts/token.json
+scripts/client_secret*.json
+*.download
+*.candidate
