@@ -1,15 +1,100 @@
 <?php
-
+declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
+/**
+ * Smart Asset Management System
+ * Maintenance Risk Details Page
+ *
+ * Displays:
+ * - Laptop information
+ * - Predictive maintenance risk
+ * - Model feature values
+ * - Maintenance history
+ * - Device usage history
+ * - Latest saved prediction
+ */
 
-require __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/bootstrap.php';
 
 require_login(['admin', 'super_admin']);
 
 require_once __DIR__ . '/backend/maintenance_risk.php';
 
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('maintenance_page_escape')) {
+    function maintenance_page_escape(mixed $value): string
+    {
+        return htmlspecialchars(
+            (string)($value ?? ''),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+    }
+}
+
+if (!function_exists('maintenance_page_query')) {
+    /**
+     * Execute a prepared query and return all rows.
+     */
+    function maintenance_page_query(
+        mysqli $conn,
+        string $sql,
+        string $types = '',
+        array $params = []
+    ): array {
+        $stmt = $conn->prepare($sql);
+
+        if (!$stmt) {
+            throw new RuntimeException(
+                'Unable to prepare database query: ' . $conn->error
+            );
+        }
+
+        if ($types !== '') {
+            $stmt->bind_param($types, ...$params);
+        }
+
+        if (!$stmt->execute()) {
+            $error = $stmt->error;
+            $stmt->close();
+
+            throw new RuntimeException(
+                'Database query failed: ' . $error
+            );
+        }
+
+        $result = $stmt->get_result();
+        $rows = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+
+        if ($result) {
+            $result->free();
+        }
+
+        $stmt->close();
+
+        return $rows;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Validate database connection
+|--------------------------------------------------------------------------
+*/
+
+if (!isset($conn) || !($conn instanceof mysqli)) {
+    error_log('Maintenance risk page: database connection unavailable.');
+
+    http_response_code(500);
+    exit('The database service is currently unavailable.');
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -17,179 +102,293 @@ require_once __DIR__ . '/backend/maintenance_risk.php';
 |--------------------------------------------------------------------------
 */
 
-$laptopId = (int)($_GET['laptop_id'] ?? 0);
+$laptopId = filter_var(
+    $_GET['laptop_id'] ?? null,
+    FILTER_VALIDATE_INT,
+    ['options' => ['min_range' => 1]]
+);
 
-if ($laptopId <= 0) {
-
-    flash('No valid laptop was selected.');
-
+if ($laptopId === false || $laptopId === null) {
+    flash('Please select a valid laptop.');
     header('Location: maintenance.php');
-
     exit;
 }
 
+$laptopId = (int)$laptopId;
 
 /*
 |--------------------------------------------------------------------------
-| Get Laptop Details
+| Load Laptop Details
 |--------------------------------------------------------------------------
 */
 
-$stmt = $conn->prepare("
-    SELECT
-        id,
-        asset_tag,
-        serial_number,
-        brand,
-        model,
-        department,
-        processor_tier,
-        ram_gb,
-        storage_gb,
-        assigned_to,
-        status,
-        purchase_date,
-        warranty_expiry,
-        created_at
-    FROM laptops
-    WHERE id = ?
-    LIMIT 1
-");
+try {
+    $laptopRows = maintenance_page_query(
+        $conn,
+        "SELECT
+            id,
+            asset_tag,
+            serial_number,
+            brand,
+            model,
+            department,
+            processor_tier,
+            ram_gb,
+            storage_gb,
+            assigned_to,
+            status,
+            purchase_date,
+            warranty_expiry,
+            created_at
+         FROM laptops
+         WHERE id = ?
+         LIMIT 1",
+        'i',
+        [$laptopId]
+    );
 
-$stmt->bind_param(
-    'i',
-    $laptopId
-);
+    if (!$laptopRows) {
+        flash('Laptop not found.');
+        header('Location: maintenance.php');
+        exit;
+    }
 
-$stmt->execute();
+    $laptop = $laptopRows[0];
+} catch (Throwable $e) {
+    error_log('Maintenance risk page - laptop lookup: ' . $e->getMessage());
 
-$result = $stmt->get_result();
-
-$laptop = $result->fetch_assoc();
-
-$stmt->close();
-
-
-if (!$laptop) {
-
-    flash('Laptop not found.');
-
-    header('Location: maintenance.php');
-
-    exit;
+    http_response_code(500);
+    exit('Unable to load laptop details. Please try again later.');
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| Generate Maintenance Risk
+| Generate Current Prediction
 |--------------------------------------------------------------------------
 |
-| true = save the prediction to maintenance_risk_predictions.
+| Passing true saves the successful prediction to
+| maintenance_risk_predictions.
 |
 */
 
-$prediction = maintenance_risk(
-    $laptopId,
-    true
-);
+try {
+    $prediction = maintenance_risk($laptopId, true);
 
+    if (!is_array($prediction)) {
+        $prediction = [
+            'success' => false,
+            'error' => 'The prediction service returned an unexpected result.',
+        ];
+    }
+} catch (Throwable $e) {
+    error_log('Maintenance risk page - prediction: ' . $e->getMessage());
+
+    $prediction = [
+        'success' => false,
+        'error' => 'Unable to generate a maintenance prediction.',
+    ];
+}
 
 /*
 |--------------------------------------------------------------------------
-| Maintenance History
+| Validate Prediction Values for Display
 |--------------------------------------------------------------------------
 */
 
-$stmt = $conn->prepare("
-    SELECT
-        m.id,
-        m.issue_description,
-        m.repair_cost,
-        m.status,
-        m.repaired_at,
-        m.created_at
-    FROM maintenance_records m
-    WHERE m.laptop_id = ?
-    ORDER BY m.created_at DESC
-");
+$predictionAvailable = ($prediction['success'] ?? false) === true;
 
-$stmt->bind_param(
-    'i',
-    $laptopId
-);
+$level = 'Unknown';
+$score = null;
+$scorePercentage = null;
+$modelVersion = 'Not available';
+$features = [];
+$predictionSaved = false;
 
-$stmt->execute();
+if ($predictionAvailable) {
+    $rawScore = $prediction['score'] ?? null;
+    $rawLevel = $prediction['level'] ?? null;
 
-$maintenanceHistory = $stmt->get_result();
+    if (
+        is_numeric($rawScore) &&
+        is_finite((float)$rawScore) &&
+        (float)$rawScore >= 0 &&
+        (float)$rawScore <= 1 &&
+        is_string($rawLevel) &&
+        in_array($rawLevel, ['Low', 'Medium', 'High'], true)
+    ) {
+        $score = (float)$rawScore;
+        $scorePercentage = $score * 100;
+        $level = $rawLevel;
 
-$stmt->close();
+        $modelVersion = (string)(
+            $prediction['version'] ?? 'logistic-regression-v1'
+        );
 
+        $features = is_array($prediction['features'] ?? null)
+            ? $prediction['features']
+            : [];
+
+        $predictionSaved = ($prediction['prediction_saved'] ?? false) === true;
+    } else {
+        $predictionAvailable = false;
+        $prediction['error'] =
+            'The prediction result contains invalid score or risk-level values.';
+    }
+}
 
 /*
 |--------------------------------------------------------------------------
-| Device Usage History
+| Risk Badge Class
 |--------------------------------------------------------------------------
 */
 
-$stmt = $conn->prepare("
-    SELECT
-        usage_date,
-        active_hours,
-        crash_count,
-        battery_health_percent
-    FROM device_usage_daily
-    WHERE laptop_id = ?
-    ORDER BY usage_date DESC
-    LIMIT 30
-");
+$riskClass = 'risk-unknown';
 
-$stmt->bind_param(
-    'i',
-    $laptopId
-);
-
-$stmt->execute();
-
-$usageHistory = $stmt->get_result();
-
-$stmt->close();
-
+if ($level === 'Low') {
+    $riskClass = 'risk-low';
+} elseif ($level === 'Medium') {
+    $riskClass = 'risk-medium';
+} elseif ($level === 'High') {
+    $riskClass = 'risk-high';
+}
 
 /*
 |--------------------------------------------------------------------------
-| Latest Saved Prediction
+| Load Maintenance History
 |--------------------------------------------------------------------------
 */
 
-$stmt = $conn->prepare("
-    SELECT
-        risk_score,
-        risk_level,
-        model_version,
-        factors,
-        predicted_at
-    FROM maintenance_risk_predictions
-    WHERE laptop_id = ?
-    ORDER BY predicted_at DESC
-    LIMIT 1
-");
+try {
+    $maintenanceHistory = maintenance_page_query(
+        $conn,
+        "SELECT
+            id,
+            issue_description,
+            repair_cost,
+            status,
+            repaired_at,
+            created_at
+         FROM maintenance_records
+         WHERE laptop_id = ?
+         ORDER BY created_at DESC
+         LIMIT 100",
+        'i',
+        [$laptopId]
+    );
+} catch (Throwable $e) {
+    error_log('Maintenance risk page - history: ' . $e->getMessage());
 
-$stmt->bind_param(
-    'i',
-    $laptopId
-);
-
-$stmt->execute();
-
-$latestPrediction = $stmt->get_result()->fetch_assoc();
-
-$stmt->close();
-
+    $maintenanceHistory = [];
+    $maintenanceHistoryError = true;
+}
 
 /*
 |--------------------------------------------------------------------------
-| Page
+| Load Device Usage History
+|--------------------------------------------------------------------------
+*/
+
+try {
+    $usageHistory = maintenance_page_query(
+        $conn,
+        "SELECT
+            usage_date,
+            active_hours,
+            crash_count,
+            battery_health_percent
+         FROM device_usage_daily
+         WHERE laptop_id = ?
+         ORDER BY usage_date DESC, id DESC
+         LIMIT 30",
+        'i',
+        [$laptopId]
+    );
+} catch (Throwable $e) {
+    error_log('Maintenance risk page - usage: ' . $e->getMessage());
+
+    $usageHistory = [];
+    $usageHistoryError = true;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Load Latest Saved Prediction
+|--------------------------------------------------------------------------
+|
+| This is queried separately so the page can show the latest database
+| record even if the current prediction request failed.
+|
+*/
+
+try {
+    $savedPredictionRows = maintenance_page_query(
+        $conn,
+        "SELECT
+            risk_score,
+            risk_level,
+            model_version,
+            factors,
+            predicted_at
+         FROM maintenance_risk_predictions
+         WHERE laptop_id = ?
+         ORDER BY predicted_at DESC
+         LIMIT 1",
+        'i',
+        [$laptopId]
+    );
+
+    $latestPrediction = $savedPredictionRows[0] ?? null;
+} catch (Throwable $e) {
+    error_log('Maintenance risk page - saved prediction: ' . $e->getMessage());
+
+    $latestPrediction = null;
+    $savedPredictionError = true;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Decode Saved Feature Values
+|--------------------------------------------------------------------------
+*/
+
+$savedFactors = [];
+
+if ($latestPrediction && !empty($latestPrediction['factors'])) {
+    $decodedFactors = json_decode(
+        (string)$latestPrediction['factors'],
+        true
+    );
+
+    if (is_array($decodedFactors)) {
+        $savedFactors = $decodedFactors;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Format Helpers
+|--------------------------------------------------------------------------
+*/
+
+$formatDate = static function ($value): string {
+    if (empty($value)) {
+        return 'Not recorded';
+    }
+
+    return (string)$value;
+};
+
+$formatNumber = static function ($value, int $decimals = 2): string {
+    if (!is_numeric($value)) {
+        return 'Not recorded';
+    }
+
+    return number_format((float)$value, $decimals);
+};
+
+/*
+|--------------------------------------------------------------------------
+| Render Page
 |--------------------------------------------------------------------------
 */
 
@@ -197,745 +396,672 @@ layout_start('Maintenance Risk');
 
 ?>
 
-<div class="hero">
+<style>
+    .maintenance-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-bottom: 30px;
+    }
 
-    <div>
+    .maintenance-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+    }
 
-        <h1>
-            Maintenance Risk Details
-        </h1>
+    .maintenance-hero h1 {
+        margin-bottom: 8px;
+    }
 
-        <p class="muted">
-            Predictive maintenance analysis for
-            <strong>
-                <?= e($laptop['asset_tag']) ?>
-            </strong>
-        </p>
+    .maintenance-muted {
+        opacity: 0.75;
+    }
 
-    </div>
+    .maintenance-panel {
+        margin-top: 22px;
+        padding: 22px;
+        border-radius: 12px;
+        overflow-x: auto;
+    }
 
-    <div>
+    .maintenance-panel h2 {
+        margin-top: 0;
+        margin-bottom: 18px;
+    }
 
-        <a
-            href="maintenance.php"
-            style="
-                display:inline-block;
-                text-decoration:none;
-            "
-        >
-            ← Back to Maintenance
+    .maintenance-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .maintenance-table th,
+    .maintenance-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.22);
+        vertical-align: top;
+    }
+
+    .maintenance-table th {
+        font-weight: 600;
+    }
+
+    .maintenance-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .maintenance-button {
+        display: inline-block;
+        padding: 10px 15px;
+        border-radius: 8px;
+        text-decoration: none;
+        border: 1px solid rgba(128, 128, 128, 0.4);
+    }
+
+    .maintenance-button:hover {
+        opacity: 0.82;
+    }
+
+    .maintenance-risk-card {
+        padding: 22px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(128, 128, 128, 0.25);
+    }
+
+    .maintenance-risk-card h3 {
+        margin-top: 0;
+    }
+
+    .risk-low {
+        border-left: 5px solid #16a34a;
+    }
+
+    .risk-medium {
+        border-left: 5px solid #d97706;
+    }
+
+    .risk-high {
+        border-left: 5px solid #dc2626;
+    }
+
+    .risk-unknown {
+        border-left: 5px solid #6b7280;
+    }
+
+    .maintenance-risk-score {
+        font-size: 28px;
+        font-weight: 700;
+        margin: 12px 0;
+    }
+
+    .maintenance-risk-label {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 6px;
+        background: rgba(128, 128, 128, 0.15);
+        font-weight: 600;
+    }
+
+    .maintenance-notice {
+        padding: 15px;
+        border-radius: 9px;
+        margin: 14px 0;
+        border: 1px solid rgba(128, 128, 128, 0.3);
+    }
+
+    .maintenance-feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin: 18px 0;
+    }
+
+    .maintenance-feature {
+        padding: 14px;
+        border-radius: 9px;
+        border: 1px solid rgba(128, 128, 128, 0.22);
+    }
+
+    .maintenance-feature-label {
+        font-size: 13px;
+        opacity: 0.75;
+        margin-bottom: 7px;
+    }
+
+    .maintenance-feature-value {
+        font-size: 20px;
+        font-weight: 650;
+        overflow-wrap: anywhere;
+    }
+
+    .maintenance-section-note {
+        margin-top: 12px;
+        font-size: 13px;
+        opacity: 0.75;
+    }
+
+    @media (max-width: 650px) {
+        .maintenance-panel {
+            padding: 15px;
+        }
+
+        .maintenance-table th,
+        .maintenance-table td {
+            padding: 9px;
+        }
+
+        .maintenance-risk-score {
+            font-size: 23px;
+        }
+    }
+</style>
+
+<div class="maintenance-page">
+
+    <header class="maintenance-hero">
+        <div>
+            <h1>Maintenance Risk Details</h1>
+
+            <p class="maintenance-muted">
+                Predictive maintenance analysis for
+                <strong>
+                    <?= maintenance_page_escape($laptop['asset_tag'] ?? '') ?>
+                </strong>
+            </p>
+        </div>
+
+        <a class="maintenance-button" href="maintenance.php">
+            &larr; Back to Maintenance
         </a>
+    </header>
 
-    </div>
+    <!-- Laptop details -->
 
-</div>
+    <section class="panel maintenance-panel">
+        <h2>Laptop Details</h2>
 
-
-<!--
-|--------------------------------------------------------------------------
-| Laptop Information
-|--------------------------------------------------------------------------
--->
-
-<section style="margin-top:24px">
-
-    <div class="panel">
-
-        <h2>
-            Laptop Details
-        </h2>
-
-        <table>
-
+        <table class="maintenance-table">
             <tbody>
-
                 <tr>
                     <th>Asset Tag</th>
-
-                    <td>
-                        <?= e($laptop['asset_tag']) ?>
-                    </td>
+                    <td><?= maintenance_page_escape($laptop['asset_tag']) ?></td>
                 </tr>
 
                 <tr>
                     <th>Serial Number</th>
-
                     <td>
-                        <?= e($laptop['serial_number']) ?>
+                        <?= maintenance_page_escape(
+                            $laptop['serial_number'] ?: 'Not recorded'
+                        ) ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>Brand</th>
-
-                    <td>
-                        <?= e($laptop['brand']) ?>
-                    </td>
+                    <td><?= maintenance_page_escape($laptop['brand']) ?></td>
                 </tr>
 
                 <tr>
                     <th>Model</th>
-
-                    <td>
-                        <?= e($laptop['model']) ?>
-                    </td>
+                    <td><?= maintenance_page_escape($laptop['model']) ?></td>
                 </tr>
 
                 <tr>
                     <th>Department</th>
-
                     <td>
-                        <?= e(
-                            $laptop['department']
-                            ?: 'Not recorded'
+                        <?= maintenance_page_escape(
+                            $laptop['department'] ?: 'Not recorded'
                         ) ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>Processor Tier</th>
-
                     <td>
-                        <?= e(
-                            $laptop['processor_tier']
-                            ?: 'Not recorded'
+                        <?= maintenance_page_escape(
+                            $laptop['processor_tier'] ?: 'Not recorded'
                         ) ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>RAM</th>
-
                     <td>
-
-                        <?php if ($laptop['ram_gb'] !== null): ?>
-
-                            <?= e($laptop['ram_gb']) ?> GB
-
-                        <?php else: ?>
-
-                            Not recorded
-
-                        <?php endif; ?>
-
+                        <?= $laptop['ram_gb'] !== null
+                            ? maintenance_page_escape($laptop['ram_gb']) . ' GB'
+                            : 'Not recorded' ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>Storage</th>
-
                     <td>
-
-                        <?php if ($laptop['storage_gb'] !== null): ?>
-
-                            <?= e($laptop['storage_gb']) ?> GB
-
-                        <?php else: ?>
-
-                            Not recorded
-
-                        <?php endif; ?>
-
+                        <?= $laptop['storage_gb'] !== null
+                            ? maintenance_page_escape($laptop['storage_gb']) . ' GB'
+                            : 'Not recorded' ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>Assigned To</th>
-
                     <td>
-
-                        <?= $laptop['assigned_to']
-                            ? e($laptop['assigned_to'])
-                            : 'Not assigned'
-                        ?>
-
+                        <?= maintenance_page_escape(
+                            $laptop['assigned_to'] ?: 'Not assigned'
+                        ) ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>Status</th>
-
                     <td>
-                        <strong>
-                            <?= e($laptop['status']) ?>
-                        </strong>
+                        <?= maintenance_page_escape($laptop['status']) ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>Purchase Date</th>
-
                     <td>
-                        <?= e(
-                            $laptop['purchase_date']
-                            ?: 'Not recorded'
+                        <?= maintenance_page_escape(
+                            $formatDate($laptop['purchase_date'])
                         ) ?>
                     </td>
                 </tr>
 
                 <tr>
                     <th>Warranty Expiry</th>
-
                     <td>
-                        <?= e(
-                            $laptop['warranty_expiry']
-                            ?: 'Not recorded'
+                        <?= maintenance_page_escape(
+                            $formatDate($laptop['warranty_expiry'])
                         ) ?>
                     </td>
                 </tr>
 
                 <tr>
-                    <th>Created At</th>
-
+                    <th>Registered At</th>
                     <td>
-                        <?= e($laptop['created_at']) ?>
+                        <?= maintenance_page_escape(
+                            $formatDate($laptop['created_at'])
+                        ) ?>
                     </td>
                 </tr>
-
             </tbody>
-
         </table>
+    </section>
 
-    </div>
+    <!-- Current prediction -->
 
-</section>
+    <section class="panel maintenance-panel">
+        <h2>Predictive Maintenance Result</h2>
 
+        <?php if ($predictionAvailable): ?>
 
-<!--
-|--------------------------------------------------------------------------
-| Prediction Result
-|--------------------------------------------------------------------------
--->
-
-<section style="margin-top:24px">
-
-    <div class="panel">
-
-        <h2>
-            Predictive Maintenance Result
-        </h2>
-
-        <?php if ($prediction['success'] ?? false): ?>
-
-            <?php
-
-            $level =
-                $prediction['level']
-                ?? 'Unknown';
-
-            $score =
-                (float)(
-                    $prediction['score']
-                    ?? 0
-                );
-
-            $riskClass = '';
-
-            if ($level === 'High') {
-
-                $riskClass = 'danger';
-
-            } elseif ($level === 'Medium') {
-
-                $riskClass = 'warning';
-            }
-
-            ?>
-
-            <div
-                class="<?= e($riskClass) ?>"
-                style="
-                    padding:20px;
-                    margin-bottom:20px;
-                    border-radius:10px;
-                "
-            >
-
-                <h2 style="margin-top:0">
-
-                    <?= e($level) ?> Risk
-
-                </h2>
-
-                <p style="font-size:20px">
-
-                    Maintenance Risk Score:
-
-                    <strong>
-
-                        <?= number_format(
-                            $score * 100,
-                            2
-                        ) ?>%
-
-                    </strong>
-
-                </p>
-
-                <p class="muted">
-
-                    Model:
-                    <?= e(
-                        $prediction['version']
-                        ?? 'logistic-regression-v1'
-                    ) ?>
-
-                </p>
-
-            </div>
-
-
-            <!--
-            |--------------------------------------------------------------------------
-            | Prediction Features
-            |--------------------------------------------------------------------------
-            -->
-
-            <h3>
-                Prediction Factors
-            </h3>
-
-            <table>
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            Feature
-                        </th>
-
-                        <th>
-                            Value
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    <tr>
-
-                        <td>
-                            Repair Count
-                        </td>
-
-                        <td>
-                            <?= e(
-                                $prediction['features']['repair_count']
-                                ?? 0
-                            ) ?>
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td>
-                            Open Repair Count
-                        </td>
-
-                        <td>
-                            <?= e(
-                                $prediction['features']['open_repair_count']
-                                ?? 0
-                            ) ?>
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td>
-                            Asset Age
-                        </td>
-
-                        <td>
-
-                            <?= number_format(
-                                (float)(
-                                    $prediction['features']['asset_age_years']
-                                    ?? 0
-                                ),
-                                2
-                            ) ?>
-
-                            years
-
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td>
-                            Warranty Days Remaining
-                        </td>
-
-                        <td>
-
-                            <?= e(
-                                $prediction['features']['warranty_days_remaining']
-                                ?? 0
-                            ) ?>
-
-                            days
-
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td>
-                            Active Hours — Last 30 Days
-                        </td>
-
-                        <td>
-
-                            <?= number_format(
-                                (float)(
-                                    $prediction['features']['active_hours_30d']
-                                    ?? 0
-                                ),
-                                1
-                            ) ?>
-
-                            hours
-
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td>
-                            Crashes — Last 30 Days
-                        </td>
-
-                        <td>
-
-                            <?= e(
-                                $prediction['features']['crash_count_30d']
-                                ?? 0
-                            ) ?>
-
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td>
-                            Battery Health
-                        </td>
-
-                        <td>
-
-                            <?php
-
-                            $battery =
-                                $prediction['features']['battery_health_percent']
-                                ?? null;
-
-                            ?>
-
-                            <?= $battery !== null
-                                ? e($battery) . '%'
-                                : 'Not recorded'
-                            ?>
-
-                        </td>
-
-                    </tr>
-
-                </tbody>
-
-            </table>
-
-
-        <?php else: ?>
-
-            <div class="danger">
-
+            <div class="maintenance-risk-card <?= maintenance_page_escape($riskClass) ?>">
                 <h3>
-                    Prediction Unavailable
+                    <span class="maintenance-risk-label">
+                        <?= maintenance_page_escape($level) ?> Risk
+                    </span>
                 </h3>
 
-                <p>
+                <div class="maintenance-risk-score">
+                    <?= number_format((float)$scorePercentage, 2) ?>%
+                </div>
 
-                    <?= e(
-                        $prediction['error']
-                        ?? 'Unable to generate prediction.'
-                    ) ?>
-
+                <p class="maintenance-muted">
+                    Estimated model probability of maintenance being required
+                    within the model's target period.
                 </p>
 
+                <p>
+                    <strong>Model version:</strong>
+                    <?= maintenance_page_escape($modelVersion) ?>
+                </p>
+
+                <p>
+                    <strong>Prediction saved:</strong>
+                    <?= $predictionSaved ? 'Yes' : 'No' ?>
+                </p>
+            </div>
+
+            <h3>Prediction Factors</h3>
+
+            <div class="maintenance-feature-grid">
+                <div class="maintenance-feature">
+                    <div class="maintenance-feature-label">Repair Count</div>
+                    <div class="maintenance-feature-value">
+                        <?= maintenance_page_escape(
+                            $features['repair_count'] ?? 'Not available'
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="maintenance-feature">
+                    <div class="maintenance-feature-label">Open Repairs</div>
+                    <div class="maintenance-feature-value">
+                        <?= maintenance_page_escape(
+                            $features['open_repair_count'] ?? 'Not available'
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="maintenance-feature">
+                    <div class="maintenance-feature-label">Asset Age</div>
+                    <div class="maintenance-feature-value">
+                        <?= maintenance_page_escape(
+                            $formatNumber($features['asset_age_years'] ?? null)
+                        ) ?>
+                        years
+                    </div>
+                </div>
+
+                <div class="maintenance-feature">
+                    <div class="maintenance-feature-label">Warranty Remaining</div>
+                    <div class="maintenance-feature-value">
+                        <?= maintenance_page_escape(
+                            $features['warranty_days_remaining'] ?? 'Not available'
+                        ) ?>
+                        days
+                    </div>
+                </div>
+
+                <div class="maintenance-feature">
+                    <div class="maintenance-feature-label">
+                        Active Hours — Last 30 Days
+                    </div>
+                    <div class="maintenance-feature-value">
+                        <?= maintenance_page_escape(
+                            $formatNumber($features['active_hours_30d'] ?? null, 1)
+                        ) ?>
+                        hrs
+                    </div>
+                </div>
+
+                <div class="maintenance-feature">
+                    <div class="maintenance-feature-label">
+                        Crashes — Last 30 Days
+                    </div>
+                    <div class="maintenance-feature-value">
+                        <?= maintenance_page_escape(
+                            $features['crash_count_30d'] ?? 'Not available'
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="maintenance-feature">
+                    <div class="maintenance-feature-label">Battery Health</div>
+                    <div class="maintenance-feature-value">
+                        <?php if (isset($features['battery_health_percent'])): ?>
+                            <?= maintenance_page_escape(
+                                $formatNumber($features['battery_health_percent'], 1)
+                            ) ?>%
+                        <?php else: ?>
+                            Not available
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <p class="maintenance-section-note">
+                The score is a model estimate, not a guarantee of future failure.
+                Risk categories depend on the thresholds configured by the model API.
+            </p>
+
+        <?php else: ?>
+
+            <div class="maintenance-notice">
+                <h3>Prediction Unavailable</h3>
+
+                <p>
+                    <?= maintenance_page_escape(
+                        $prediction['error']
+                        ?? 'Unable to generate a maintenance prediction.'
+                    ) ?>
+                </p>
+
+                <p class="maintenance-muted">
+                    Check that the Flask service is running and that the laptop
+                    has the required maintenance and usage data.
+                </p>
             </div>
 
         <?php endif; ?>
+    </section>
 
-    </div>
+    <!-- Latest saved prediction -->
 
-</section>
+    <section class="panel maintenance-panel">
+        <h2>Latest Saved Prediction</h2>
 
+        <?php if (!empty($savedPredictionError)): ?>
 
-<!--
-|--------------------------------------------------------------------------
-| Maintenance History
-|--------------------------------------------------------------------------
--->
+            <p class="maintenance-muted">
+                The saved prediction history could not be retrieved.
+            </p>
 
-<section style="margin-top:24px">
+        <?php elseif ($latestPrediction): ?>
 
-    <div class="panel">
+            <?php
+            $savedScore = $latestPrediction['risk_score'] ?? null;
+            $savedScoreValid = is_numeric($savedScore)
+                && is_finite((float)$savedScore)
+                && (float)$savedScore >= 0
+                && (float)$savedScore <= 1;
+            ?>
 
-        <h2>
-            Maintenance History
-        </h2>
-
-        <?php if ($maintenanceHistory->num_rows > 0): ?>
-
-            <table>
-
-                <thead>
-
+            <table class="maintenance-table">
+                <tbody>
                     <tr>
-
-                        <th>
-                            Date
-                        </th>
-
-                        <th>
-                            Issue
-                        </th>
-
-                        <th>
-                            Repair Cost
-                        </th>
-
-                        <th>
-                            Status
-                        </th>
-
-                        <th>
-                            Repaired At
-                        </th>
-
+                        <th>Risk Level</th>
+                        <td>
+                            <?= maintenance_page_escape(
+                                $latestPrediction['risk_level'] ?? 'Unknown'
+                            ) ?>
+                        </td>
                     </tr>
 
+                    <tr>
+                        <th>Risk Score</th>
+                        <td>
+                            <?= $savedScoreValid
+                                ? number_format((float)$savedScore * 100, 2) . '%'
+                                : 'Invalid or unavailable' ?>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Model Version</th>
+                        <td>
+                            <?= maintenance_page_escape(
+                                $latestPrediction['model_version'] ?? 'Not recorded'
+                            ) ?>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Predicted At</th>
+                        <td>
+                            <?= maintenance_page_escape(
+                                $latestPrediction['predicted_at'] ?? 'Not recorded'
+                            ) ?>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <?php if ($savedFactors): ?>
+                <details style="margin-top: 16px;">
+                    <summary>View saved prediction features</summary>
+
+                    <pre style="white-space: pre-wrap; overflow-wrap: anywhere;"><?= maintenance_page_escape(
+                        json_encode(
+                            $savedFactors,
+                            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+                        )
+                    ) ?></pre>
+                </details>
+            <?php endif; ?>
+
+        <?php else: ?>
+
+            <p class="maintenance-muted">
+                No saved prediction is available for this laptop yet.
+            </p>
+
+        <?php endif; ?>
+    </section>
+
+    <!-- Maintenance history -->
+
+    <section class="panel maintenance-panel">
+        <h2>Maintenance History</h2>
+
+        <?php if (!empty($maintenanceHistoryError)): ?>
+
+            <p class="maintenance-muted">
+                Maintenance history could not be loaded.
+            </p>
+
+        <?php elseif ($maintenanceHistory): ?>
+
+            <table class="maintenance-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Issue</th>
+                        <th>Repair Cost</th>
+                        <th>Status</th>
+                        <th>Repaired At</th>
+                    </tr>
                 </thead>
 
                 <tbody>
-
-                    <?php while (
-                        $m =
-                        $maintenanceHistory->fetch_assoc()
-                    ): ?>
-
+                    <?php foreach ($maintenanceHistory as $record): ?>
                         <tr>
-
                             <td>
-                                <?= e(
-                                    $m['created_at']
+                                <?= maintenance_page_escape(
+                                    $record['created_at'] ?? 'Not recorded'
                                 ) ?>
                             </td>
 
                             <td>
-                                <?= e(
-                                    $m['issue_description']
-                                ) ?>
+                                <?= nl2br(maintenance_page_escape(
+                                    $record['issue_description'] ?? 'Not recorded'
+                                )) ?>
                             </td>
 
                             <td>
-
                                 KES
                                 <?= number_format(
-                                    (float)$m['repair_cost'],
+                                    (float)($record['repair_cost'] ?? 0),
                                     2
                                 ) ?>
-
                             </td>
 
                             <td>
-                                <?= e(
-                                    $m['status']
+                                <?= maintenance_page_escape(
+                                    $record['status'] ?? 'Unknown'
                                 ) ?>
                             </td>
 
                             <td>
-
-                                <?= e(
-                                    $m['repaired_at']
-                                    ?: 'Not repaired'
+                                <?= maintenance_page_escape(
+                                    $formatDate($record['repaired_at'] ?? null)
                                 ) ?>
-
                             </td>
-
                         </tr>
-
-                    <?php endwhile; ?>
-
+                    <?php endforeach; ?>
                 </tbody>
-
             </table>
 
         <?php else: ?>
 
-            <p class="muted">
-                No maintenance records have been recorded
-                for this laptop.
+            <p class="maintenance-muted">
+                No maintenance records have been recorded for this laptop.
             </p>
 
         <?php endif; ?>
+    </section>
 
-    </div>
+    <!-- Device usage history -->
 
-</section>
+    <section class="panel maintenance-panel">
+        <h2>Device Usage History</h2>
 
+        <?php if (!empty($usageHistoryError)): ?>
 
-<!--
-|--------------------------------------------------------------------------
-| Device Usage
-|--------------------------------------------------------------------------
--->
+            <p class="maintenance-muted">
+                Device usage history could not be loaded.
+            </p>
 
-<section style="margin-top:24px">
+        <?php elseif ($usageHistory): ?>
 
-    <div class="panel">
-
-        <h2>
-            Device Usage History
-        </h2>
-
-        <?php if ($usageHistory->num_rows > 0): ?>
-
-            <table>
-
+            <table class="maintenance-table">
                 <thead>
-
                     <tr>
-
-                        <th>
-                            Date
-                        </th>
-
-                        <th>
-                            Active Hours
-                        </th>
-
-                        <th>
-                            Crashes
-                        </th>
-
-                        <th>
-                            Battery Health
-                        </th>
-
+                        <th>Date</th>
+                        <th>Active Hours</th>
+                        <th>Crashes</th>
+                        <th>Battery Health</th>
                     </tr>
-
                 </thead>
 
                 <tbody>
-
-                    <?php while (
-                        $u =
-                        $usageHistory->fetch_assoc()
-                    ): ?>
-
+                    <?php foreach ($usageHistory as $usage): ?>
                         <tr>
-
                             <td>
-                                <?= e(
-                                    $u['usage_date']
+                                <?= maintenance_page_escape(
+                                    $usage['usage_date'] ?? 'Not recorded'
                                 ) ?>
                             </td>
 
                             <td>
-
-                                <?= number_format(
-                                    (float)$u['active_hours'],
-                                    1
+                                <?= maintenance_page_escape(
+                                    $formatNumber($usage['active_hours'] ?? null, 1)
                                 ) ?>
-
                                 hrs
-
                             </td>
 
                             <td>
-                                <?= e(
-                                    $u['crash_count']
+                                <?= maintenance_page_escape(
+                                    $usage['crash_count'] ?? 'Not recorded'
                                 ) ?>
                             </td>
 
                             <td>
-
-                                <?= $u['battery_health_percent'] !== null
-
-                                    ? e(
-                                        $u['battery_health_percent']
+                                <?= $usage['battery_health_percent'] !== null
+                                    ? maintenance_page_escape(
+                                        $formatNumber(
+                                            $usage['battery_health_percent'],
+                                            1
+                                        )
                                     ) . '%'
-
-                                    : 'Not recorded'
-                                ?>
-
+                                    : 'Not recorded' ?>
                             </td>
-
                         </tr>
-
-                    <?php endwhile; ?>
-
+                    <?php endforeach; ?>
                 </tbody>
-
             </table>
 
         <?php else: ?>
 
-            <p class="muted">
-
-                No device usage records have been
-                recorded for this laptop.
-
+            <p class="maintenance-muted">
+                No device usage records have been recorded for this laptop.
             </p>
 
         <?php endif; ?>
+    </section>
 
+    <div style="margin-top: 24px;">
+        <a class="maintenance-button" href="maintenance.php">
+            &larr; Back to Maintenance
+        </a>
     </div>
-
-</section>
-
-
-<!--
-|--------------------------------------------------------------------------
-| Back Button
-|--------------------------------------------------------------------------
--->
-
-<div
-    style="
-        margin-top:25px;
-        margin-bottom:30px;
-    "
->
-
-    <a
-        href="maintenance.php"
-        style="
-            display:inline-block;
-            text-decoration:none;
-        "
-    >
-
-        ← Back to Maintenance
-
-    </a>
 
 </div>
 
-
 <?php
-
 layout_end();
-
 ?>
