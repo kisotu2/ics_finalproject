@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-27
+
+- Restored super-admin user registration as a protected, CSRF-validated flow with hashed passwords and audit logging.
+- Refined the shared application styles for a calmer, more spacious and responsive interface with clearer keyboard focus states.
+
 ## 2026-10-26
 
 - Added an authenticated Active Directory synchronization page and a token-protected JSON ingestion endpoint.

@@ -1,126 +1,156 @@
 <?php
-require 'db.php';
-session_start();
+declare(strict_types=1);
+
+require __DIR__ . '/bootstrap.php';
+require_login(['super_admin']);
+
+$error = '';
+$fullName = '';
+$email = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
 
-    $full_name = trim($_POST['full_name']);
-    $email = trim($_POST['email']);
-    $password = trim($_POST['password']);
+    $fullName = trim((string) ($_POST['full_name'] ?? ''));
+    $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+    $password = (string) ($_POST['password'] ?? '');
+    $passwordConfirmation = (string) ($_POST['password_confirmation'] ?? '');
 
-    if (!empty($full_name) && !empty($email) && !empty($password)) {
-
-        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-        $role = "user";
-
-        $stmt = $conn->prepare("INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("ssss", $full_name, $email, $hashedPassword, $role);
-
-        if ($stmt->execute()) {
-            header("Location: login.php");
-            exit();
-        } else {
-            $error = "Email already exists.";
-        }
-
-        $stmt->close();
+    if ($fullName === '' || mb_strlen($fullName, 'UTF-8') > 150) {
+        $error = 'Enter a name between 1 and 150 characters.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
+        $error = 'Enter a valid email address.';
+    } elseif (strlen($password) < 12) {
+        $error = 'Use a password with at least 12 characters.';
+    } elseif ($password !== $passwordConfirmation) {
+        $error = 'The passwords do not match.';
     } else {
-        $error = "All fields are required.";
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+
+        try {
+            $conn->begin_transaction();
+
+            $stmt = $conn->prepare(
+                "INSERT INTO users (full_name, email, password, role, status)
+                 VALUES (?, ?, ?, 'user', 'active')"
+            );
+            $stmt->bind_param('sss', $fullName, $email, $passwordHash);
+            $stmt->execute();
+            $userId = (int) $conn->insert_id;
+            $stmt->close();
+
+            audit($conn, 'user_registered', 'user', $userId, [
+                'email' => $email,
+                'role' => 'user',
+            ]);
+
+            $conn->commit();
+            flash('User account created successfully.');
+            header('Location: users.php');
+            exit;
+        } catch (mysqli_sql_exception $exception) {
+            $conn->rollback();
+
+            if ((int) $exception->getCode() === 1062) {
+                $error = 'An account with that email address already exists.';
+            } else {
+                error_log('User registration failed: ' . $exception->getMessage());
+                $error = 'The account could not be created. Please try again.';
+            }
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            error_log('User registration audit failed: ' . $exception->getMessage());
+            $error = 'The account could not be created. Please try again.';
+        }
     }
 }
+
+layout_start('Register user');
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Register - Asset Management</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(to right,#b08116,#99bb4f);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
+<section class="user-registration">
+    <div class="page-heading">
+        <div>
+            <div class="eyebrow">USER MANAGEMENT</div>
+            <h1>Create a user account</h1>
+            <p class="page-description">Add an active employee account to the system. The new account will have standard user access.</p>
+        </div>
+        <a class="button secondary" href="users.php">Back to users</a>
+    </div>
 
-        .card {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            width: 350px;
-        }
+    <section class="panel registration-panel">
+        <div class="panel-header">
+            <div>
+                <h2>Account details</h2>
+                <span>Only super administrators can create user accounts.</span>
+            </div>
+        </div>
 
-        h2 {
-            text-align: center;
-            color: #b08116;
-            margin-bottom: 1.5rem;
-        }
+        <?php if ($error !== ''): ?>
+            <p class="notice error" role="alert"><?= e($error) ?></p>
+        <?php endif; ?>
 
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 8px 0;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            font-size: 1rem;
-        }
+        <form method="post" class="registration-form" autocomplete="off">
+            <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
 
-        button {
-            width: 100%;
-            padding: 10px;
-            background-color: #99bb4f;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1rem;
-            margin-top: 10px;
-        }
+            <label>
+                Full name
+                <input
+                    type="text"
+                    name="full_name"
+                    value="<?= e($fullName) ?>"
+                    maxlength="150"
+                    autocomplete="name"
+                    placeholder="e.g. Alex Morgan"
+                    required
+                >
+            </label>
 
-        button:hover {
-            opacity: 0.9;
-        }
+            <label>
+                Work email
+                <input
+                    type="email"
+                    name="email"
+                    value="<?= e($email) ?>"
+                    maxlength="190"
+                    autocomplete="email"
+                    placeholder="name@company.com"
+                    required
+                >
+            </label>
 
-        .error {
-            color: red;
-            text-align: center;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
+            <div class="form-grid">
+                <label>
+                    Temporary password
+                    <input
+                        type="password"
+                        name="password"
+                        minlength="12"
+                        autocomplete="new-password"
+                        aria-describedby="registration-password-help"
+                        required
+                    >
+                    <small id="registration-password-help" class="muted">At least 12 characters. Share it through an approved secure channel.</small>
+                </label>
 
-        .login-link {
-            display: block;
-            text-align: center;
-            margin-top: 12px;
-            font-size: 0.9rem;
-            color: #b08116;
-            text-decoration: none;
-        }
+                <label>
+                    Confirm password
+                    <input
+                        type="password"
+                        name="password_confirmation"
+                        minlength="12"
+                        autocomplete="new-password"
+                        required
+                    >
+                </label>
+            </div>
 
-        .login-link:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
+            <div class="registration-actions">
+                <a class="button secondary" href="users.php">Cancel</a>
+                <button type="submit">Create user account</button>
+            </div>
+        </form>
+    </section>
+</section>
 
-<div class="card">
-    <h2>Register</h2>
-
-    <?php if(isset($error)) echo "<p class='error'>$error</p>"; ?>
-
-    <form method="POST">
-        <input type="text" name="full_name" placeholder="Full Name" required>
-        <input type="email" name="email" placeholder="Email" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Register</button>
-    </form>
-
-    <a class="login-link" href="login.php">Already have an account? Login</a>
-</div>
-
-</body>
-</html>
+<?php layout_end(); ?>

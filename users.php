@@ -86,9 +86,9 @@ layout_start('Users');
             USER MANAGEMENT
         </div>
 
-        <h2>
+        <h1>
             Registered Users
-        </h2>
+        </h1>
 
         <p>
             Manage and monitor accounts registered
@@ -101,6 +101,7 @@ layout_start('Users');
     <a
         class="button"
         href="register.php"
+        aria-label="Register a new user"
     >
         + Register User
     </a>
