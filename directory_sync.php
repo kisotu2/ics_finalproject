@@ -197,7 +197,7 @@ layout_start('Directory sync');
             </li>
             <li>
                 <strong>Preview, then send</strong>
-                <p>Use <code>scripts/Sync-ActiveDirectoryInventory.ps1</code> for an administrator-managed OU preview and batch send, or provide <code>scripts/Send-ThisLaptopInventory.ps1</code> to a trusted, domain-joined laptop for a single-device submission.</p>
+                <p>Use <code>scripts/Sync-ActiveDirectoryInventory.ps1</code> for an administrator-managed OU preview and batch send. For a Mac with an AD computer object, <a href="scripts/Send-ThisMacInventory.ps1" download>download the macOS PowerShell sender</a>; provide the device's AD identity and HTTPS endpoint when running it. <code>scripts/Send-ThisLaptopInventory.ps1</code> is for Windows.</p>
             </li>
         </ol>
     </section>

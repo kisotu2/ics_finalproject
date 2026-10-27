@@ -342,6 +342,22 @@ Run it from PowerShell on the laptop:
 
 The script requires HTTPS and sends immediately; it does not save the token or hardware payload to disk. Do not add a token to the script, share a token through email/chat, or expose the shared ingestion token to untrusted users. Restrict who can run the script and provision its token through managed deployment. A computer that is not joined to the directory, or whose AD object cannot be read, cannot be submitted through this AD-GUID-keyed endpoint.
 
+For a Mac with an existing AD computer object, use [`scripts/Send-ThisMacInventory.ps1`](scripts/Send-ThisMacInventory.ps1). It is designed for PowerShell 7 on macOS and collects Apple hardware data using local macOS utilities. The sender requires IT to supply the matching AD GUID, computer name, distinguished name, and enabled state, plus the HTTPS endpoint. It does not query Active Directory itself; PowerShell's Windows ActiveDirectory module is not supported on macOS.
+
+After downloading the script (for example to `~/Downloads`), run it on the Mac using the installed PowerShell executable (or `pwsh` if it is on `PATH`):
+
+```bash
+/usr/local/microsoft/powershell/7-preview/pwsh \
+  -File "$HOME/Downloads/Send-ThisMacInventory.ps1" \
+  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php' \
+  -AdGuid 'a6f33f8b-f62d-4acb-96be-8e1ef6ab0c21' \
+  -DirectoryComputerName 'MAC-ACCOUNTING-01' \
+  -DistinguishedName 'CN=MAC-ACCOUNTING-01,OU=Macs,DC=example,DC=com' \
+  -Enabled
+```
+
+The `-Enabled` switch indicates the AD object is enabled; omit it if IT confirms that it is disabled. The default is preview-only and does not require the token. Review the displayed hardware and AD identity. To submit, rerun the same command with `-Send`. Replace the example identity only with values confirmed by IT for this Mac. The script reads `AD_SYNC_TOKEN` from its process environment only when `-Send` is specified; IT must provision it securely and must not place it in the command, script, or a shared download. The application currently accepts the server-configured sync token, not per-device credentials, so access to that token must remain restricted to authorized administrators and devices. Configure VPN/network allowlisting and HTTPS as required by the server policy.
+
 ### Secure endpoint configuration
 
 The ingestion endpoint is:
