@@ -317,6 +317,14 @@ For an existing installation:
 
 The migration copies existing non-`IRA-LAP-` serial values into `manufacturer_serial`, then assigns database-ID-based internal serials to existing laptop rows. Manufacturer serials are deliberately not unique because endpoint data can be missing or duplicated.
 
+For an existing installation with the AD inventory schema already applied, back up the database and apply `migrations/20261027_virtual_laptop_portal.sql` once. Change its `USE ira_assets` statement to the configured database if required. It adds virtual display state, an optional responsible administrator, issue/update/notification tables, and an issue link on maintenance records. It does not delete or rewrite existing laptop or maintenance records. Restore the backup to roll back; do not drop new tables while they contain reports.
+
+### Virtual laptop and issue review
+
+Employees can open **My Laptop** for devices assigned to their own account, review known inventory data, and toggle a persisted virtual display state. This is only an application visualization and never sends power commands to the physical computer. Employees can report an issue; reports are assigned to the laptop's responsible administrator, or notified to active super administrators when none is set. Administrators set the responsible administrator in the dashboard and review reports from **Issue review**. Approving a report creates one linked maintenance record; rejection, information requests, employee responses, duplicates, and status changes are retained in issue updates and audit history. Notifications are in-app and can be marked read.
+
+AD sync is inventory synchronization only. No endpoint monitoring agent or device-health ingestion is currently configured, so the portal explicitly shows monitoring as not configured and does not invent online status, errors, IP, MAC, or free-storage values. The issue report currently accepts text and occurrence time; it does not accept attachments. The normal maintenance page remains available for recording work, but technician assignment, parts, cost, and verification fields have not been added to this issue approval UI.
+
 ## Active Directory Laptop Inventory
 
 The PHP application does not read Microsoft Active Directory directly. It accepts records from `scripts/Sync-ActiveDirectoryInventory.ps1`, an authorized connector intended to run on a domain-joined Windows host.

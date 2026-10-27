@@ -24,3 +24,20 @@ Database and Windows-domain scenarios below require an isolated test database, a
 | AD-12 | Single-Mac connector | On a managed Mac with PowerShell 7, run `Send-ThisMacInventory.ps1` in preview mode with IT-confirmed AD identity fields, then rerun with `-Send` and a securely provisioned process token. | Preview sends nothing; the send collects Mac hardware via macOS utilities and submits one record for the supplied AD GUID. Confirm missing disk/model values remain unknown and no token or payload file is written. |
 
 Record actual outcomes and environment when running the database/domain cases. They are not considered passed merely because the test plan exists.
+
+## Virtual laptop portal workflow checks
+
+Run these checks only after applying `migrations/20261027_virtual_laptop_portal.sql` to an isolated database:
+
+| ID | Scenario | Expected result |
+|---|---|---|
+| VP-01 | Employee device privacy | An employee sees only assigned laptops; changing the `id` parameter to another employee's laptop returns an unavailable response and reveals no asset details. |
+| VP-02 | Virtual power state | A permitted user toggles the virtual display; the state persists after reload, an audit/history entry is recorded, and the laptop's actual status/assignment remain unchanged. CSRF failure is rejected. |
+| VP-03 | Issue report | An assigned employee submits a valid report; it is `pending_admin_review`, the employee and responsible administrator are notified, and the laptop status remains unchanged. |
+| VP-04 | Unauthorized report | An employee attempts to submit against an unassigned laptop ID; the request is rejected and no issue is created. |
+| VP-05 | Approval idempotency | An administrator approves an issue once; exactly one maintenance row is linked. A repeated approval is refused and does not duplicate the job. |
+| VP-06 | Review decisions | Reject, request-information, and duplicate actions require the expected reason/reference, preserve the original issue, notify the reporter, and record an issue update/audit event. |
+| VP-07 | Maintenance completion | A linked maintenance job can be started and resolved; other active maintenance work and retired/disposed statuses are not overwritten. |
+| VP-08 | Monitoring limitations | With no monitoring agent configured, the portal displays `Not configured` and does not claim live connectivity or health information. |
+
+These are manual integration cases, not automated passes. No issue workflow or migration has been run against the configured application database in this development environment.

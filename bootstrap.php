@@ -582,7 +582,11 @@ function layout_start(string $title): void
 <?= nav_item('Maintenance', 'maintenance.php', '⌁', $currentPage) ?>
 <?= nav_item('Laptop assignment', 'laptop_assignment.php', '⇄', $currentPage) ?>
 <?= nav_item('Directory sync', 'directory_sync.php', 'AD', $currentPage) ?>
+<?= nav_item('Issue review', 'laptop_issues.php', '!', $currentPage) ?>
+<?= nav_item('Virtual devices', 'my_laptop.php', '▱', $currentPage) ?>
 <?= nav_item('History', 'history.php', '◷', $currentPage) ?>
+<?php else: ?>
+<?= nav_item('My Laptop', 'my_laptop.php', '▱', $currentPage) ?>
 <?php endif; ?>
 <?php if ($role === 'super_admin'): ?>
     <?= nav_item('Users', 'users.php', '♙', $currentPage) ?>
