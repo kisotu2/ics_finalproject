@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 require_login(['admin', 'super_admin']);
 require_once __DIR__ . '/backend/laptop_issues.php';
+require_once __DIR__ . '/backend/maintenance_risk.php';
 
 if (!laptop_portal_schema_ready($conn)) {
     http_response_code(503);
@@ -240,7 +241,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $history->close();
 
             $conn->commit();
-            flash($issue['reference_code'] . ' updated: ' . laptop_issue_status_label($newStatus) . '.');
+
+            $flashMessage =
+                $issue['reference_code'] .
+                ' updated: ' .
+                laptop_issue_status_label($newStatus) .
+                '.';
+            $flashType = 'success';
+
+            if (in_array($action, ['approve', 'start_maintenance', 'resolve'], true)) {
+                try {
+                    $prediction = maintenance_risk((int) $issue['laptop_id'], true);
+                } catch (Throwable $exception) {
+                    error_log(
+                        'Automatic maintenance prediction failed for issue ' .
+                        $issueId .
+                        ': ' .
+                        $exception->getMessage()
+                    );
+                    $prediction = [
+                        'success' => false,
+                        'error' => 'Unable to generate a maintenance prediction.',
+                    ];
+                }
+
+                if (
+                    empty($prediction['success']) ||
+                    empty($prediction['prediction_saved'])
+                ) {
+                    $flashMessage .=
+                        ' The automatic risk check failed: ' .
+                        ($prediction['error'] ?? 'Unknown error.');
+                    $flashType = 'error';
+                } elseif (!empty($prediction['notification_error'])) {
+                    $flashMessage .= ' ' . $prediction['notification_error'];
+                    $flashType = 'error';
+                } elseif (!empty($prediction['notification_sent'])) {
+                    $flashMessage .= ' The responsible administrator was notified of the high risk.';
+                }
+
+                if (($prediction['prediction_source'] ?? '') === 'local_model_fallback') {
+                    $flashMessage .= ' The local model was used because the Flask API is offline.';
+                }
+            }
+
+            flash($flashMessage, $flashType);
             header('Location: laptop_issues.php' . ($filter !== '' ? '?status=' . rawurlencode($filter) : ''));
             exit;
         } catch (DomainException $exception) {

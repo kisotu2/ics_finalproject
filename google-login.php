@@ -92,27 +92,6 @@ try {
         );
     }
 
-    // Keep the existing email OTP verification requirement.
-    $otp = create_login_otp($conn, (int) $user['id']);
-
-    if (!send_login_otp($user['email'], $user['full_name'], $otp)) {
-        googleLoginError(
-            'We could not send your verification code. Please try again later.'
-        );
-    }
-
-    // Do not authenticate the user until OTP verification succeeds.
-    session_regenerate_id(true);
-
-    $_SESSION['pending_login_user_id'] = (int) $user['id'];
-    $_SESSION['pending_login_email'] = $user['email'];
-    $_SESSION['pending_login_name'] = $user['full_name'];
-    $_SESSION['pending_login_role'] = $user['role'];
-    $_SESSION['otp_sent_at'] = time();
-
-    header('Location: verify_otp.php');
-    exit;
-
 } catch (Throwable $e) {
     error_log('Google login error: ' . $e->getMessage());
 
@@ -120,3 +99,29 @@ try {
         'Google sign-in could not be completed. Please try again.'
     );
 }
+
+session_regenerate_id(true);
+
+$_SESSION['user_id'] = (int) $user['id'];
+$_SESSION['email'] = $user['email'];
+$_SESSION['name'] = $user['full_name'];
+$_SESSION['role'] = $user['role'];
+
+unset(
+    $_SESSION['pending_login_user_id'],
+    $_SESSION['pending_login_email'],
+    $_SESSION['pending_login_name'],
+    $_SESSION['pending_login_role'],
+    $_SESSION['otp_sent_at']
+);
+
+audit(
+    $conn,
+    'login',
+    'user',
+    (int) $user['id'],
+    ['method' => 'google']
+);
+
+header('Location: dashboard.php');
+exit;

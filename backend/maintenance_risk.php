@@ -7,11 +7,96 @@
  * prepares the seven features required by the trained Logistic
  * Regression model, and sends them to the Flask ML API.
  *
- * The Flask service is responsible for loading the trained model
- * and performing the prediction.
+ * The Flask service performs predictions when available. PHP uses the
+ * same model artefact locally if the API cannot be reached.
  */
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/maintenance_model.php';
+
+function maintenance_risk_notify_admins(
+    mysqli $conn,
+    int $laptopId,
+    string $assetTag,
+    float $score,
+    string $episodeStart
+): int {
+    $stmt = $conn->prepare(
+        "SELECT u.id
+         FROM laptops l
+         JOIN users u ON u.id = l.responsible_admin_id
+         WHERE l.id = ?
+           AND u.role IN ('admin', 'super_admin')
+           AND u.status = 'active'
+         LIMIT 1"
+    );
+    $stmt->bind_param('i', $laptopId);
+    $stmt->execute();
+    $recipients = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if ($recipients === []) {
+        $admins = $conn->query(
+            "SELECT id
+             FROM users
+             WHERE role = 'super_admin'
+               AND status = 'active'"
+        );
+        $recipients = $admins->fetch_all(MYSQLI_ASSOC);
+    }
+
+    if ($recipients === []) {
+        throw new RuntimeException('No active administrator is available for notifications.');
+    }
+
+    $title = 'High maintenance risk detected';
+    $message = sprintf(
+        '%s has a high predicted maintenance risk (%.1f%%). Review the maintenance risk register.',
+        $assetTag,
+        $score * 100
+    );
+    $notification = $conn->prepare(
+        'INSERT INTO user_notifications (user_id, issue_id, title, message)
+         VALUES (?, NULL, ?, ?)'
+    );
+    $existingNotification = $conn->prepare(
+        'SELECT id
+         FROM user_notifications
+         WHERE user_id = ?
+           AND title = ?
+           AND LEFT(message, CHAR_LENGTH(?)) = ?
+           AND created_at >= ?
+         LIMIT 1'
+    );
+    $messagePrefix = $assetTag . ' has a high predicted maintenance risk (';
+    $sentCount = 0;
+
+    foreach ($recipients as $recipient) {
+        $userId = (int) $recipient['id'];
+        $existingNotification->bind_param(
+            'issss',
+            $userId,
+            $title,
+            $messagePrefix,
+            $messagePrefix,
+            $episodeStart
+        );
+        $existingNotification->execute();
+
+        if ($existingNotification->get_result()->fetch_assoc()) {
+            continue;
+        }
+
+        $notification->bind_param('iss', $userId, $title, $message);
+        $notification->execute();
+        $sentCount++;
+    }
+
+    $existingNotification->close();
+    $notification->close();
+
+    return $sentCount;
+}
 
 
 /**
@@ -448,105 +533,115 @@ function maintenance_risk(
 
         CURLOPT_RETURNTRANSFER => true,
 
-        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_CONNECTTIMEOUT => 1,
 
-        CURLOPT_TIMEOUT => 15
+        CURLOPT_TIMEOUT => 3
     ]);
 
-
+    $predictionSource = 'flask_api';
     $response = curl_exec($ch);
-
 
     if ($response === false) {
 
-        $error = curl_error($ch);
+        $serviceError = curl_error($ch);
 
         curl_close($ch);
 
-        return [
-            'success' => false,
-            'error' =>
-                'The predictive maintenance service is unavailable.',
-            'details' => $error,
-            'score' => 0,
-            'level' => 'Unknown',
-            'version' => 'logistic-regression-v1',
-            'features' => $features,
-            'usage_records_30d' => $usageRecords30d
-        ];
-    }
-
-
-    $httpCode =
-        curl_getinfo(
-            $ch,
-            CURLINFO_HTTP_CODE
+        error_log(
+            'Predictive maintenance API unavailable; using local model: ' .
+            $serviceError
         );
 
-    curl_close($ch);
+        try {
+            $prediction = maintenance_risk_local_prediction($features);
+            $predictionSource = 'local_model_fallback';
+            $httpCode = 200;
+        } catch (Throwable $e) {
+            error_log('Local maintenance model failed: ' . $e->getMessage());
 
+            return [
+                'success' => false,
+                'error' => 'The prediction API and local model are unavailable.',
+                'details' => $e->getMessage(),
+                'score' => 0,
+                'level' => 'Unknown',
+                'version' => 'logistic-regression-v1',
+                'features' => $features,
+                'usage_records_30d' => $usageRecords30d
+            ];
+        }
+    } else {
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $prediction = json_decode($response, true);
+
+        $validResponse =
+            $httpCode === 200 &&
+            is_array($prediction) &&
+            is_numeric($prediction['probability'] ?? null) &&
+            is_finite((float) $prediction['probability']) &&
+            (float) $prediction['probability'] >= 0 &&
+            (float) $prediction['probability'] <= 1 &&
+            in_array($prediction['risk_level'] ?? null, ['Low', 'Medium', 'High'], true) &&
+            in_array($prediction['prediction'] ?? null, [0, 1, '0', '1'], true);
+
+        if (!$validResponse && $httpCode >= 500) {
+            error_log(
+                'Predictive maintenance API returned HTTP ' .
+                $httpCode .
+                '; using local model.'
+            );
+
+            try {
+                $prediction = maintenance_risk_local_prediction($features);
+                $predictionSource = 'local_model_fallback';
+                $httpCode = 200;
+            } catch (Throwable $e) {
+                error_log('Local maintenance model failed: ' . $e->getMessage());
+
+                return [
+                    'success' => false,
+                    'error' => 'The prediction API and local model are unavailable.',
+                    'details' => $e->getMessage(),
+                    'score' => 0,
+                    'level' => 'Unknown',
+                    'version' => 'logistic-regression-v1',
+                    'features' => $features,
+                    'usage_records_30d' => $usageRecords30d
+                ];
+            }
+        } elseif (!$validResponse) {
+            return [
+                'success' => false,
+                'error' => 'The predictive maintenance service returned an invalid response.',
+                'http_code' => $httpCode,
+                'response' => $response,
+                'score' => 0,
+                'level' => 'Unknown',
+                'version' => 'logistic-regression-v1',
+                'features' => $features,
+                'usage_records_30d' => $usageRecords30d
+            ];
+        }
+    }
 
     /*
      * ---------------------------------------------------------
-     * 10. Decode Flask response
+     * 10. Extract prediction
      * ---------------------------------------------------------
      */
 
-    $prediction =
-        json_decode(
-            $response,
-            true
-        );
+    $score = (float) $prediction['probability'];
 
+    $level = (string) $prediction['risk_level'];
 
-    if (
-        $httpCode !== 200 ||
-        !is_array($prediction)
-    ) {
-
-        return [
-            'success' => false,
-            'error' =>
-                'The predictive maintenance service returned an invalid response.',
-            'http_code' => $httpCode,
-            'response' => $response,
-            'score' => 0,
-            'level' => 'Unknown',
-            'version' => 'logistic-regression-v1',
-            'features' => $features,
-            'usage_records_30d' => $usageRecords30d
-        ];
-    }
+    $predictionValue = (int) $prediction['prediction'];
 
 
     /*
      * ---------------------------------------------------------
-     * 11. Extract prediction
-     * ---------------------------------------------------------
-     */
-
-    $score =
-        (float)(
-            $prediction['probability']
-            ?? 0
-        );
-
-    $level =
-        (string)(
-            $prediction['risk_level']
-            ?? 'Unknown'
-        );
-
-    $predictionValue =
-        (int)(
-            $prediction['prediction']
-            ?? 0
-        );
-
-
-    /*
-     * ---------------------------------------------------------
-     * 12. Model version
+     * 11. Model version
      * ---------------------------------------------------------
      */
 
@@ -556,11 +651,13 @@ function maintenance_risk(
 
     /*
      * ---------------------------------------------------------
-     * 13. Save prediction when explicitly requested
+     * 12. Save prediction when explicitly requested
      * ---------------------------------------------------------
      */
 
     $predictionSaved = false;
+    $notificationSent = false;
+    $notificationError = '';
 
     if ($savePrediction) {
 
@@ -571,7 +668,6 @@ function maintenance_risk(
 
 
         try {
-
             $stmt = $conn->prepare("
                 INSERT INTO maintenance_risk_predictions
                 (
@@ -603,6 +699,69 @@ function maintenance_risk(
 
             $predictionSaved = true;
 
+            if ($level === 'High') {
+                try {
+                    $lowRiskStmt = $conn->prepare("
+                        SELECT predicted_at
+                        FROM maintenance_risk_predictions
+                        WHERE laptop_id = ?
+                          AND risk_level <> 'High'
+                        ORDER BY predicted_at DESC, id DESC
+                        LIMIT 1
+                    ");
+                    $lowRiskStmt->bind_param('i', $laptopId);
+                    $lowRiskStmt->execute();
+                    $lastLowRisk = $lowRiskStmt
+                        ->get_result()
+                        ->fetch_assoc();
+                    $lowRiskStmt->close();
+
+                    if ($lastLowRisk) {
+                        $episodeStart = (string) $lastLowRisk['predicted_at'];
+                    } else {
+                        $firstHighStmt = $conn->prepare("
+                            SELECT predicted_at
+                            FROM maintenance_risk_predictions
+                            WHERE laptop_id = ?
+                              AND risk_level = 'High'
+                            ORDER BY predicted_at ASC, id ASC
+                            LIMIT 1
+                        ");
+                        $firstHighStmt->bind_param('i', $laptopId);
+                        $firstHighStmt->execute();
+                        $firstHigh = $firstHighStmt
+                            ->get_result()
+                            ->fetch_assoc();
+                        $firstHighStmt->close();
+
+                        if (!$firstHigh) {
+                            throw new RuntimeException(
+                                'The high-risk prediction could not be located for notification deduplication.'
+                            );
+                        }
+
+                        $episodeStart = (string) $firstHigh['predicted_at'];
+                    }
+
+                    $recipientCount = maintenance_risk_notify_admins(
+                        $conn,
+                        $laptopId,
+                        (string) $laptop['asset_tag'],
+                        $score,
+                        $episodeStart
+                    );
+                    $notificationSent = $recipientCount > 0;
+                } catch (Throwable $e) {
+                    $notificationError = 'The risk was saved, but its notification could not be sent.';
+                    error_log(
+                        'High maintenance risk notification failed for laptop ' .
+                        $laptopId .
+                        ': ' .
+                        $e->getMessage()
+                    );
+                }
+            }
+
         } catch (Throwable $e) {
 
             return [
@@ -622,7 +781,7 @@ function maintenance_risk(
 
     /*
      * ---------------------------------------------------------
-     * 14. Return complete result
+     * 13. Return complete result
      * ---------------------------------------------------------
      */
 
@@ -657,6 +816,9 @@ function maintenance_risk(
         'version' =>
             $modelVersion,
 
+        'prediction_source' =>
+            $predictionSource,
+
         'features' =>
             $features,
 
@@ -664,6 +826,12 @@ function maintenance_risk(
             $usageRecords30d,
 
         'prediction_saved' =>
-            $predictionSaved
+            $predictionSaved,
+
+        'notification_sent' =>
+            $notificationSent,
+
+        'notification_error' =>
+            $notificationError
     ];
 }

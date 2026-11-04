@@ -234,11 +234,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             );
 
-            flash(
+            $prediction = maintenance_risk($asset, true);
 
-                'Usage data recorded. The predictive maintenance inputs have been updated.'
+            if (
+                empty($prediction['success']) ||
+                empty($prediction['prediction_saved'])
+            ) {
+                flash(
+                    'Usage data was recorded, but the automatic risk check failed: ' .
+                    ($prediction['error'] ?? 'Unknown error.'),
+                    'error'
+                );
+            } elseif (!empty($prediction['notification_error'])) {
+                flash(
+                    'Usage data and its risk prediction were saved. ' .
+                    $prediction['notification_error'],
+                    'error'
+                );
+            } else {
+                $message = sprintf(
+                    'Usage data recorded. Updated maintenance risk: %s (%.1f%%).',
+                    $prediction['level'],
+                    (float) $prediction['score'] * 100
+                );
 
-            );
+                if (!empty($prediction['notification_sent'])) {
+                    $message .= ' The responsible administrator was notified.';
+                }
+                if (($prediction['prediction_source'] ?? '') === 'local_model_fallback') {
+                    $message .= ' The local model was used because the Flask API is offline.';
+                }
+
+                flash($message);
+            }
 
         }
 
@@ -274,8 +302,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             ) {
 
-                flash(
-
+                $message =
                     'Maintenance prediction generated and saved for asset ' .
 
                     ($prediction['asset_tag'] ?? $asset) .
@@ -294,9 +321,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     ) .
 
-                    '%).'
+                    '%).';
 
-                );
+                if (!empty($prediction['notification_sent'])) {
+                    $message .= ' The responsible administrator was notified.';
+                }
+                if (($prediction['prediction_source'] ?? '') === 'local_model_fallback') {
+                    $message .= ' The local model was used because the Flask API is offline.';
+                }
+
+                if (!empty($prediction['notification_error'])) {
+                    flash($message . ' ' . $prediction['notification_error'], 'error');
+                } else {
+                    flash($message);
+                }
 
             } else {
 
@@ -304,7 +342,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     'Unable to save the maintenance prediction: ' .
 
-                    ($prediction['error'] ?? 'Unknown error.')
+                    ($prediction['error'] ?? 'Unknown error.'),
+                    'error'
 
                 );
 
@@ -426,11 +465,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         );
 
-        flash(
+        $prediction = maintenance_risk($asset, true);
 
-            'Maintenance record created and asset marked for Maintenance.'
+        if (
+            empty($prediction['success']) ||
+            empty($prediction['prediction_saved'])
+        ) {
+            flash(
+                'Maintenance was recorded, but the automatic risk check failed: ' .
+                ($prediction['error'] ?? 'Unknown error.'),
+                'error'
+            );
+        } elseif (!empty($prediction['notification_error'])) {
+            flash(
+                'Maintenance and its risk prediction were saved. ' .
+                $prediction['notification_error'],
+                'error'
+            );
+        } else {
+            $message = 'Maintenance record created and asset marked for Maintenance. ' .
+                'Updated predicted risk: ' .
+                ($prediction['level'] ?? 'Unknown') .
+                '.';
 
-        );
+            if (!empty($prediction['notification_sent'])) {
+                $message .= ' The responsible administrator was notified.';
+            }
+            if (($prediction['prediction_source'] ?? '') === 'local_model_fallback') {
+                $message .= ' The local model was used because the Flask API is offline.';
+            }
+
+            flash($message);
+        }
 
     }
 
@@ -1181,10 +1247,11 @@ layout_start('Maintenance');
                     : 0;
 
             $version =
-
                 $prediction['version']
-
                 ?? 'logistic-regression-v1';
+            $predictionSource =
+                $prediction['prediction_source']
+                ?? 'unknown';
 
             $usageRecords =
 
@@ -1360,8 +1427,11 @@ layout_start('Maintenance');
                                 $version
 
                             ) ?>
-
                         </small>
+                        <?php if ($predictionSource === 'local_model_fallback'): ?>
+                            <br>
+                            <small class="muted">Local model (Flask API offline)</small>
+                        <?php endif; ?>
 
                     <?php else: ?>
 

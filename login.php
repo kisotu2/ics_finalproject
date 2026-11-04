@@ -10,7 +10,10 @@ if (!empty($_SESSION['user_id'])) {
     exit;
 }
 
-$error = '';
+$error = is_string($_SESSION['google_login_error'] ?? null)
+    ? $_SESSION['google_login_error']
+    : '';
+unset($_SESSION['google_login_error']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -137,97 +140,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-layout_start('Sign in');
 ?>
 
-<section
-    class="panel"
-    style="max-width:460px;margin:70px auto;"
->
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#19241d">
+    <title>Sign in · Asset Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="auth-page">
+    <main class="auth-shell">
+        <aside class="auth-intro">
+            <a class="auth-brand" href="index.php" aria-label="SLK Asset Management home">
+                <span class="auth-brand-mark">SLK</span>
+                <span><strong>SLK</strong><small>Asset Management</small></span>
+            </a>
 
-    <h1>Welcome back</h1>
+            <div class="auth-intro-copy">
+                <p class="auth-kicker">ASSET MANAGEMENT</p>
+                <h1>Everything in its place.</h1>
+                <p>A dependable workspace for the people who keep your organization moving.</p>
+            </div>
 
-    <p class="muted">
-        Sign in to access your Asset Management account.
-    </p>
+            <p class="auth-intro-footer">A clearer view of the tools your team relies on.</p>
+        </aside>
 
-    <?php if ($error): ?>
+        <section class="auth-content" aria-labelledby="login-title">
+            <div class="auth-form-wrap">
+                <p class="auth-mobile-brand">SLK <span>ASSET MANAGEMENT</span></p>
+                <p class="auth-eyebrow">YOUR WORKSPACE</p>
+                <h2 id="login-title">Welcome back</h2>
+                <p class="auth-subtitle">Sign in to continue to your account.</p>
 
-        <p class="notice error">
-            <?= e($error) ?>
-        </p>
+                <?php if ($error): ?>
+                    <p class="notice error auth-error" role="alert">
+                        <?= e($error) ?>
+                    </p>
+                <?php endif; ?>
 
-    <?php endif; ?>
+                <form method="post" class="auth-form">
+                    <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
 
-    <form method="post">
+                    <label for="email">Email address</label>
+                    <input
+                        id="email"
+                        type="email"
+                        name="email"
+                        autocomplete="email"
+                        placeholder="you@organization.com"
+                        required
+                    >
 
-        <input
-            type="hidden"
-            name="csrf"
-            value="<?= e(csrf()) ?>"
-        >
+                    <label for="password">Password</label>
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        autocomplete="current-password"
+                        placeholder="Enter your password"
+                        required
+                    >
 
-        <label>
-            Email
+                    <button class="auth-submit" type="submit">Sign in</button>
+                </form>
 
-            <input
-                type="email"
-                name="email"
-                autocomplete="email"
-                placeholder="Enter your email address"
-                required
-            >
-        </label>
+                <div class="auth-divider"><span>or</span></div>
 
-        <label>
-            Password
+                <a href="google-login.php" class="auth-google">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 48 48" aria-hidden="true">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6C44.42 37.95 46.98 31.7 46.98 24.55z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.14 1.45-4.89 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    <span>Continue with Google</span>
+                </a>
 
-            <input
-                type="password"
-                name="password"
-                autocomplete="current-password"
-                placeholder="Enter your password"
-                required
-            >
-        </label>
-
-        <button type="submit">
-            Continue
-        </button>
-
-    </form>
-
-<div class="login-divider">
-    <span>OR</span>
-</div>
-
-<a href="google-login.php" class="google-login-btn">
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 48 48"
-        aria-hidden="true"
-    >
-        <path fill="#EA4335"
-            d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0
-            14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-        <path fill="#4285F4"
-            d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94
-            c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6C44.42 37.95 46.98 31.7 46.98 24.55z"/>
-        <path fill="#FBBC05"
-            d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19
-            A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19z"/>
-        <path fill="#34A853"
-            d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.14 1.45-4.89 2.3-8.18 2.3
-            -6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-    </svg>
-
-    <span>Continue with Google</span>
-</a>
-
-</section>
-
-<?php
-layout_end();
-?>
+                <p class="auth-note">Google sign-in takes you directly to your workspace.</p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

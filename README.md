@@ -73,8 +73,10 @@ The project aims to:
 
 - Extract seven features from asset, maintenance and recorded usage information.
 - Submit feature values to the Flask prediction API.
+- Fall back to the same trained model artefact locally in PHP if the Flask API is offline.
 - Estimate the likelihood of maintenance being required within the next 30 days.
 - Present a risk classification of Low, Medium or High where supported by the application workflow.
+- Recheck risk when usage or maintenance records are saved; notify the responsible administrator when an asset first enters High risk.
 
 ### Software Licence Management
 
@@ -475,7 +477,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-### 3. Start the API
+### 3. Start the API (optional)
 
 ```bash
 python flask_api/app.py
@@ -493,7 +495,7 @@ The root endpoint is:
 GET http://127.0.0.1:5000/
 ```
 
-It returns a JSON status response when the service is running.
+It returns a JSON status response when the service is running. PHP uses this API when available and falls back to the model artefact in `flask_api/maintenance_model.json` if the API cannot be reached or returns a server error. The fallback is logged by PHP, so predictions remain available without keeping Flask running.
 
 ### 4. Prediction Endpoint
 
@@ -524,6 +526,8 @@ This is an illustrative request only; the values do not describe a verified asse
 The API checks that the request body is a JSON object and that the required fields are present. It returns an error response for invalid request structures or missing fields. The prediction result depends on the loaded model and the implementation in `model_loader.py`.
 
 For local development, the API binds to `127.0.0.1`. Do not expose it to an external network without implementing and reviewing suitable authentication, access control, network restrictions and deployment security.
+
+High-risk predictions are saved and create an in-app notification for the laptop's active responsible administrator. If no active responsible administrator is assigned, active super administrators are notified. Alerts are sent when an asset transitions into High risk, rather than on every repeated prediction. Saving usage data or a maintenance record triggers a fresh prediction automatically. Notifications appear in the existing **My Laptop** inbox.
 
 ## Training the Model
 

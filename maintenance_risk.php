@@ -201,8 +201,11 @@ $level = 'Unknown';
 $score = null;
 $scorePercentage = null;
 $modelVersion = 'Not available';
+$predictionSource = 'Unknown';
 $features = [];
 $predictionSaved = false;
+$notificationSent = false;
+$notificationError = '';
 
 if ($predictionAvailable) {
     $rawScore = $prediction['score'] ?? null;
@@ -223,12 +226,17 @@ if ($predictionAvailable) {
         $modelVersion = (string)(
             $prediction['version'] ?? 'logistic-regression-v1'
         );
+        $predictionSource = ($prediction['prediction_source'] ?? '') === 'local_model_fallback'
+            ? 'Local model fallback (Flask API unavailable)'
+            : 'Flask prediction API';
 
         $features = is_array($prediction['features'] ?? null)
             ? $prediction['features']
             : [];
 
         $predictionSaved = ($prediction['prediction_saved'] ?? false) === true;
+        $notificationSent = ($prediction['notification_sent'] ?? false) === true;
+        $notificationError = (string) ($prediction['notification_error'] ?? '');
     } else {
         $predictionAvailable = false;
         $prediction['error'] =
@@ -721,9 +729,20 @@ layout_start('Maintenance Risk');
                 </p>
 
                 <p>
+                    <strong>Prediction source:</strong>
+                    <?= maintenance_page_escape($predictionSource) ?>
+                </p>
+
+                <p>
                     <strong>Prediction saved:</strong>
                     <?= $predictionSaved ? 'Yes' : 'No' ?>
                 </p>
+
+                <?php if ($notificationSent): ?>
+                    <p class="notice success">The responsible administrator was notified.</p>
+                <?php elseif ($notificationError !== ''): ?>
+                    <p class="notice error"><?= maintenance_page_escape($notificationError) ?></p>
+                <?php endif; ?>
             </div>
 
             <h3>Prediction Factors</h3>
