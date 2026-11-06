@@ -319,13 +319,13 @@ For an existing installation:
 
 The migration copies a legacy serial into `manufacturer_serial` only when that field is empty, then assigns database-ID-based internal serials to rows still using legacy serials. Existing manufacturer serial values and already-generated `IRA-LAP-` inventory serials (including collision suffixes) are preserved. Manufacturer serials are deliberately not unique because endpoint data can be missing or duplicated.
 
-For an existing installation with the AD inventory schema already applied, back up the database and apply `migrations/20261027_virtual_laptop_portal.sql` once. Change its initial `USE` statement to the configured database if required. It adds virtual display state, an optional responsible administrator, issue/update/notification tables, and an issue link on maintenance records. It does not delete or rewrite existing laptop or maintenance records. Restore the backup to roll back; do not drop new tables while they contain reports.
+For an existing installation, apply `migrations/20261027_virtual_laptop_portal.sql` and `migrations/20261106_ad_endpoint_monitoring.sql` after backing up. Change each migration’s initial `USE` statement to the configured database if needed. The monitoring migration adds AD account metadata, endpoint status and run/request tracking. It keeps the legacy virtual display column for compatibility, but the application no longer reads or changes it. It does not delete or rewrite existing laptop or maintenance records. Restore the backup to roll back; do not drop new tables while they contain reports.
 
-### Virtual laptop and issue review
+### Laptop portal and issue review
 
-Employees can open **My Laptop** for devices assigned to their own account, review known inventory data, and toggle a persisted virtual display state. This is only an application visualization and never sends power commands to the physical computer. Employees can report an issue; reports are assigned to the laptop's responsible administrator, or notified to active super administrators when none is set. Administrators set the responsible administrator in the dashboard and review reports from **Issue review**. Approving a report creates one linked maintenance record; rejection, information requests, employee responses, duplicates, and status changes are retained in issue updates and audit history. Notifications are in-app and can be marked read.
+Employees can open **My Laptop** for devices assigned to their own account, review inventory and automated endpoint status, and report an issue. The page shows AD account status separately from the last endpoint connectivity result; it has no manual power control. The legacy API returns HTTP 410 for old virtual power requests. Reports are assigned to the laptop's responsible administrator, or notified to active super administrators when none is set. Administrators review reports from **Issue review**. Approving a report creates one linked maintenance record; rejection, information requests, employee responses, duplicates, and status changes are retained in issue updates and audit history.
 
-AD sync is inventory synchronization only. No endpoint monitoring agent or device-health ingestion is currently configured, so the portal explicitly shows monitoring as not configured and does not invent online status, errors, IP, MAC, or free-storage values. The issue report currently accepts text and occurrence time; it does not accept attachments. The normal maintenance page remains available for recording work, but technician assignment, parts, cost, and verification fields have not been added to this issue approval UI.
+AD sync is performed by the Windows connector described below. Offline or unreachable endpoints remain in the inventory, keep their last known hardware data, and are never retired or deleted automatically. A complete successful run can mark a previously discovered AD object missing from its configured scope for review; it does not remove the asset, assignment, maintenance history, or serial number.
 
 ## Active Directory Laptop Inventory
 
@@ -333,9 +333,9 @@ The PHP application does not read Microsoft Active Directory directly. It accept
 
 ### What is collected
 
-The connector reads the AD computer object's GUID, computer name, distinguished name, enabled state, and AD operating-system metadata with the Active Directory PowerShell module. For each reachable computer, it uses PowerShell remoting and CIM to query manufacturer, model, BIOS serial, processor, RAM and physical storage. Active Directory commonly does **not** contain these current hardware properties.
+The connector reads the AD computer object GUID, computer name, distinguished name, DNS hostname, OU, enabled state, operating-system metadata, last logon timestamp, creation date and modification date with the Active Directory PowerShell module. For every AD computer, it uses ICMP and PowerShell remoting/CIM to classify endpoint availability and, when reachable, query manufacturer, model, BIOS serial, processor, RAM and physical storage. It always sends the AD identity, even when endpoint collection fails; null hardware is preserved as unknown in the database. Active Directory commonly does **not** contain these current hardware properties.
 
-Endpoint queries require administrator-approved remote management, appropriate least-privilege account permissions, WinRM/CIM configuration, and firewall rules on the endpoints. The connector reports unreachable computers and omits them from that run; an offline result does not delete or retire the existing inventory record.
+Endpoint queries require administrator-approved remote management, appropriate least-privilege account permissions, WinRM/CIM configuration, and firewall rules on the endpoints. Endpoint availability is stored as `online`, `offline`, `unreachable` or `unknown`. ICMP response is enough to report online even when WinRM fails; failure reasons are retained for review. A failed endpoint does not stop other computers in the run. `lastLogonTimestamp` is replicated AD metadata and may lag, so it is not used as a real-time power or availability signal.
 
 The connector does not infer a purchase date from AD object timestamps. Purchase dates remain unknown unless a trusted date is supplied in a validated payload or through the controlled training-data import. Warranty expiry may be in the future; a purchase/acquisition date may not.
 
@@ -400,7 +400,7 @@ On the domain-joined Windows host, open PowerShell with the Active Directory mod
   -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php'
 ```
 
-The default is preview-only; it queries online hardware and reports offline computers but sends nothing. After reviewing the preview and confirming the network/TLS configuration, securely prompt for the token and run the send in that same PowerShell session (or provision it with approved device-management secret storage):
+The default is preview-only; it queries the AD scope and endpoints but sends nothing. The sender includes a stable run identifier and scope across API batches; only a complete run with no record failures can mark unseen AD objects missing. After reviewing the preview and confirming the network/TLS configuration, securely prompt for the token and run the send in that same PowerShell session (or provision it with approved device-management secret storage):
 
 ```powershell
 $secureToken = Read-Host 'AD sync token' -AsSecureString
@@ -417,6 +417,22 @@ try {
 }
 ```
 
+
+### Unattended scheduling and dashboard requests
+
+On the authorized Windows host, provision the API token in the machine or service account environment through your protected configuration management. Grant the connector identity read access to the approved AD search base and only the remote endpoint permissions needed for CIM/WinRM inventory. Do not use Domain Admin for routine collection. Configure HTTPS trust and firewall allowlisting before starting the service.
+
+Register the startup runner from an elevated PowerShell session:
+
+```powershell
+.\scripts\Register-ActiveDirectoryInventoryTask.ps1 `
+  -SearchBase 'OU=Workstations,DC=example,DC=com' `
+  -ApiUrl 'https://inventory.example.com/ics_finalproject'
+```
+
+The task runs the connector loop at startup, schedules a full sync every 15 minutes, and polls the authenticated request queue every 30 seconds. The default scheduled principal is `SYSTEM`; in a domain deployment, grant the computer account the required AD read permissions and endpoint CIM access. For a dedicated gMSA, pass `-ServiceAccount 'DOMAIN\AssetSync$'`; grant it only AD read and endpoint CIM/WinRM permissions. For a regular domain service account, create the task through Windows Task Scheduler using the organization's managed credential process, and set `AD_SYNC_TOKEN` in that account's protected process environment. The web dashboard's **Synchronise Now** button creates a real queued request; the agent claims it and reports the result to the dashboard. It cannot run while the Windows agent is stopped.
+
+The migration creates `ad_sync_runs`, `ad_sync_run_devices`, `ad_sync_requests` and `ad_sync_agent_state`. Run tracking only flags unseen computers after the final batch of a complete, failure-free run. Interrupted/partial runs never mark records missing.
 
 The connector sends batches of up to 100 records. A JSON record has this shape:
 
@@ -444,7 +460,7 @@ The connector sends batches of up to 100 records. A JSON record has this shape:
 
 The example is illustrative; its values are not a claim about an actual device. Repeated sends update the same laptop by AD object GUID. Each laptop's `serial_number` is generated from its database ID (`IRA-LAP-000123`, with a deterministic collision suffix if needed); the BIOS serial remains separate in nullable, non-unique `manufacturer_serial`. Empty hardware values are preserved as unknown, not invented. The response reports created, updated and failed records plus missing/duplicate manufacturer serials. Sync events are stored in `ad_sync_events`; record-level failures are also written to the PHP server log without recording the bearer token.
 
-Administrators can view migration/token/transport status and setup limitations at `directory_sync.php`. The page does not run the connector or expose the secret. Manual laptop registration and legacy laptop AJAX creation are disabled; viewing, assignment, maintenance and reporting remain available.
+Administrators can view readiness, endpoint/account metrics, filtered inventory, recent runs and the connector poll time at `directory_sync.php`. The page does not expose the secret. Manual laptop registration and legacy laptop AJAX creation are disabled; viewing, assignment, maintenance and reporting remain available.
 
 ### AD sync tests
 
@@ -455,7 +471,7 @@ php tests/ad_sync_validation_test.php
 bash tests/ad_sync_http_test.sh
 ```
 
-The HTTP boundary test starts a temporary localhost PHP server and checks method restrictions, invalid/missing tokens, malformed JSON, content type, invalid records, and future purchase dates. Record-level validation failures return HTTP 207 while valid records in the same batch continue. Database idempotency/serial-collision, production HTTPS, unauthorized-page, and Windows endpoint scenarios are listed in [`tests/AD_SYNC_TEST_PLAN.md`](tests/AD_SYNC_TEST_PLAN.md); they require an isolated test database and/or a configured Windows domain. Do not run them against production.
+The HTTP boundary test starts a temporary localhost PHP server and checks method restrictions, invalid/missing tokens, malformed JSON, content type, invalid records, request limits/rate behavior, and transport validation. Record-level validation failures return HTTP 207 while valid records in the same batch continue. Database idempotency/serial-collision, production HTTPS, unauthorized-page, and Windows endpoint scenarios are listed in [`tests/AD_SYNC_TEST_PLAN.md`](tests/AD_SYNC_TEST_PLAN.md); they require an isolated test database and/or a configured Windows domain. Do not run them against production.
 
 ## Running the Flask API
 

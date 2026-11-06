@@ -125,4 +125,20 @@ $wrongTypeRecord['ad_guid'] = ['unexpected'];
 [$typedRecords, $typedFailures] = validate_ad_sync_batch(['version' => 1, 'computers' => [$wrongTypeRecord]]);
 assert_true($typedRecords === [] && count($typedFailures) === 1, 'Wrongly typed fields must fail cleanly without warnings.');
 
+$metadataRecord = valid_record();
+$metadataRecord['enabled'] = false;
+$metadataRecord['endpoint_status'] = 'unreachable';
+$metadataRecord['endpoint_check_reason'] = 'WinRM authorization denied.';
+$metadataRecord['dns_hostname'] = 'ws-accounting-01.example.test';
+$metadataRecord['last_logon_at'] = '2026-11-06T08:30:00Z';
+$metadataRecord['account_created_at'] = '2025-01-02T03:04:05Z';
+$metadataRecord['hardware_last_scanned_at'] = null;
+$metadata = validate_ad_sync_payload(['version'=>1,'computers'=>[$metadataRecord]])[0];
+assert_true($metadata['enabled'] === false && $metadata['endpoint_status'] === 'unreachable', 'AD account and endpoint states must remain separate validated values.');
+assert_true($metadata['last_logon_at'] === '2026-11-06 08:30:00.000000', 'AD timestamps must normalize to UTC MySQL datetime values.');
+$emptyFinal = validate_ad_sync_batch(['version'=>1,'run_id'=>'a6f33f8b-f62d-4acb-96be-8e1ef6ab0c21','scope_id'=>'OU=Workstations,DC=example,DC=test','final_batch'=>true,'full_scope'=>true,'computers'=>[]]);
+assert_true($emptyFinal[0] === [] && $emptyFinal[1] === [], 'A complete empty scope must be accepted for a final run batch.');
+$badEndpoint = valid_record(); $badEndpoint['endpoint_status'] = 'powered_off';
+assert_throws(static fn()=>validate_ad_sync_payload(['version'=>1,'computers'=>[$badEndpoint]]), 'endpoint_status must be');
+
 fwrite(STDOUT, 'Passed ' . $tests . " AD sync validation tests.\n");

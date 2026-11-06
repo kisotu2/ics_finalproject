@@ -2446,38 +2446,6 @@ button[disabled],
     background: rgba(255,255,255,.18);
 }
 
-.virtual-power-button {
-    position: absolute;
-    top: 16px;
-    right: 12px;
-    min-width: 35px;
-    min-height: 35px;
-    padding: 0 8px;
-    border: 1px solid #aeb5aa;
-    border-radius: 50%;
-    background: #dce0d8;
-    color: #374135;
-    box-shadow: none;
-}
-
-.virtual-power-button:hover {
-    background: #d0d6cb;
-    color: #20271f;
-}
-
-.virtual-power-button .power-symbol {
-    font-size: 18px;
-}
-
-.virtual-power-button #power-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-}
-
 .virtual-disclaimer,
 .monitoring-note {
     color: var(--muted);
@@ -2802,10 +2770,6 @@ button[disabled],
         height: 6px;
     }
 
-    .virtual-power-button {
-        top: 12px;
-        right: 8px;
-    }
 
     .device-details {
         grid-template-columns: 1fr;

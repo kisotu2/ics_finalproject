@@ -160,10 +160,18 @@ $record = [pscustomobject]@{
     storage_gb = $storageGb
     purchase_date = $null
     warranty_expiry = $null
+    endpoint_status = 'online'
+    endpoint_check_reason = 'Local hardware query completed on this Mac.'
+    hardware_last_scanned_at = [DateTime]::UtcNow.ToString('o')
 }
 
 $payload = @{
     version = 1
+    run_id = [guid]::NewGuid().ToString()
+    scope_id = [string]$DistinguishedName
+    full_scope = $false
+    final_batch = $true
+    request_id = $null
     computers = @($record)
 } | ConvertTo-Json -Depth 5 -Compress
 

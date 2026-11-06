@@ -30,8 +30,8 @@ function validate_ad_sync_batch(array $payload): array
     }
 
     $input = $payload['computers'];
-    if (count($input) < 1 || count($input) > 500) {
-        throw new InvalidArgumentException('A sync must contain between 1 and 500 computers.');
+    if (count($input) > 500 || (count($input) < 1 && !(($payload['final_batch'] ?? false) === true && ($payload['full_scope'] ?? false) === true && isset($payload['run_id'], $payload['scope_id'])))) {
+        throw new InvalidArgumentException('A sync must contain 1 to 500 computers; only a final scoped run may be empty.');
     }
 
     $guidCounts = [];
@@ -175,6 +175,15 @@ function validate_ad_sync_payload(array $payload): array
             'warranty_expiry' => validate_warranty_expiry(
                 validate_optional_date_value($record['warranty_expiry'] ?? null, 'warranty_expiry')
             ),
+            'dns_hostname' => validate_ad_text($record['dns_hostname'] ?? null, 'dns_hostname', 255, true),
+            'organizational_unit' => validate_ad_text($record['organizational_unit'] ?? null, 'organizational_unit', 1024, true),
+            'last_logon_at' => validate_optional_datetime_value($record['last_logon_at'] ?? null, 'last_logon_at'),
+            'account_created_at' => validate_optional_datetime_value($record['account_created_at'] ?? null, 'account_created_at'),
+            'account_modified_at' => validate_optional_datetime_value($record['account_modified_at'] ?? null, 'account_modified_at'),
+            'endpoint_status' => validate_endpoint_status($record['endpoint_status'] ?? 'unknown'),
+            'endpoint_check_reason' => validate_ad_text($record['endpoint_check_reason'] ?? null, 'endpoint_check_reason', 500, true),
+            'hardware_last_scanned_at' => validate_optional_datetime_value($record['hardware_last_scanned_at'] ?? null, 'hardware_last_scanned_at'),
+            'ad_sync_error' => validate_ad_text($record['ad_sync_error'] ?? null, 'ad_sync_error', 500, true),
         ];
 
         $records[] = $normalized;
@@ -183,17 +192,27 @@ function validate_ad_sync_payload(array $payload): array
     return $records;
 }
 
+function validate_endpoint_status(mixed $value): string
+{
+    if (!is_string($value) || !in_array($value, ['online', 'offline', 'unreachable', 'unknown'], true)) {
+        throw new InvalidArgumentException('endpoint_status must be online, offline, unreachable or unknown.');
+    }
+    return $value;
+}
+
 function validate_optional_date_value(mixed $value, string $field): ?string
 {
-    if ($value === null || $value === '') {
-        return null;
-    }
-
-    if (!is_string($value)) {
-        throw new InvalidArgumentException($field . ' must be a date string or null.');
-    }
-
+    if ($value === null || $value === '') return null;
+    if (!is_string($value)) throw new InvalidArgumentException($field . ' must be a date string or null.');
     return $value;
+}
+
+function validate_optional_datetime_value(mixed $value, string $field): ?string
+{
+    if ($value === null || $value === '') return null;
+    if (!is_string($value)) throw new InvalidArgumentException($field . ' must be a date string or null.');
+    try { return (new DateTimeImmutable($value))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s.u'); }
+    catch (Throwable) { throw new InvalidArgumentException($field . ' must be a valid date or null.'); }
 }
 
 function ad_sync_text_length(string $value): int
@@ -254,6 +273,13 @@ function ad_sync_database_schema_issues(mysqli $conn): array
             'ram_gb' => 'tinyint unsigned', 'storage_gb' => 'smallint unsigned',
             'status' => "enum('available','assigned','maintenance','retired','disposed')",
             'purchase_date' => 'date', 'warranty_expiry' => 'date',
+            'ad_dns_hostname' => 'varchar(255)', 'ad_organizational_unit' => 'varchar(1024)',
+            'ad_last_logon_at' => 'datetime(6)', 'ad_account_created_at' => 'datetime(6)',
+            'ad_account_modified_at' => 'datetime(6)', 'endpoint_status' => "enum('online','offline','unreachable','unknown')",
+            'endpoint_checked_at' => 'datetime(6)', 'last_successful_connectivity_at' => 'datetime(6)',
+            'hardware_last_scanned_at' => 'datetime(6)', 'endpoint_check_reason' => 'varchar(500)',
+            'ad_sync_error' => 'varchar(500)', 'inventory_source' => "enum('manual','active_directory','other')",
+            'ad_scope_id' => 'varchar(1024)', 'ad_last_seen_at' => 'datetime(6)', 'ad_missing_since' => 'datetime(6)',
         ],
         'ad_sync_events' => [
             'id' => 'bigint', 'source_ip' => 'varchar(45)', 'received_count' => 'int unsigned',
@@ -261,6 +287,10 @@ function ad_sync_database_schema_issues(mysqli $conn): array
             'failed_count' => 'int unsigned', 'created_at' => 'timestamp',
         ],
     ];
+    $expected['ad_sync_runs'] = ['run_id'=>'char(36)','scope_id'=>'varchar(1024)','status'=>"enum('running','successful','partial','failed')",'started_at'=>'datetime(6)','completed_at'=>'datetime(6)','received_count'=>'int unsigned','created_count'=>'int unsigned','updated_count'=>'int unsigned','failed_count'=>'int unsigned'];
+    $expected['ad_sync_run_devices'] = ['run_id'=>'char(36)','ad_object_guid'=>'char(36)'];
+    $expected['ad_sync_requests'] = ['id'=>'bigint','requested_by'=>'int','scope_id'=>'varchar(1024)','status'=>"enum('queued','running','successful','partial','failed')",'requested_at'=>'datetime(6)','started_at'=>'datetime(6)','finished_at'=>'datetime(6)','run_id'=>'char(36)','error_message'=>'varchar(500)'];
+    $expected['ad_sync_agent_state'] = ['id'=>'tinyint unsigned','agent_name'=>'varchar(150)','last_poll_at'=>'datetime(6)','last_sync_at'=>'datetime(6)','last_error'=>'varchar(500)'];
     $issues = [];
     foreach ($expected as $table => $columns) {
         $stmt = $conn->prepare('SELECT column_name, column_type FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?');
@@ -433,6 +463,24 @@ function sync_ad_computer(mysqli $conn, array $record): array
             $laptopId = (int) $conn->insert_id;
             $created = true;
         }
+
+        $metadata = $conn->prepare("UPDATE laptops SET
+            ad_dns_hostname = COALESCE(?, ad_dns_hostname),
+            ad_organizational_unit = COALESCE(?, ad_organizational_unit),
+            ad_last_logon_at = COALESCE(?, ad_last_logon_at),
+            ad_account_created_at = COALESCE(?, ad_account_created_at),
+            ad_account_modified_at = COALESCE(?, ad_account_modified_at),
+            endpoint_status = ?, endpoint_checked_at = UTC_TIMESTAMP(6),
+            endpoint_check_reason = ?,
+            last_successful_connectivity_at = IF(? = 'online', UTC_TIMESTAMP(6), last_successful_connectivity_at),
+            hardware_last_scanned_at = COALESCE(?, hardware_last_scanned_at),
+            ad_sync_error = ?, inventory_source = 'active_directory',
+            ad_scope_id = COALESCE(?, ad_scope_id), ad_last_seen_at = UTC_TIMESTAMP(6), ad_missing_since = NULL
+            WHERE id = ?");
+        $scopeId = $record['scope_id'] ?? null;
+        $metadata->bind_param('sssssssssssi', $record['dns_hostname'], $record['organizational_unit'], $record['last_logon_at'], $record['account_created_at'], $record['account_modified_at'], $record['endpoint_status'], $record['endpoint_check_reason'], $record['endpoint_status'], $record['hardware_last_scanned_at'], $record['ad_sync_error'], $scopeId, $laptopId);
+        $metadata->execute();
+        $metadata->close();
 
         $serialNumber = ensure_inventory_serial($conn, $laptopId);
 
