@@ -16,6 +16,13 @@ try {
     $conn->set_charset('utf8mb4');
 } catch (mysqli_sql_exception $exception) {
     http_response_code(500);
+    error_log('Database connection failed with MySQL error code ' . (int) $exception->getCode() . '.');
+
+    if (defined('AD_SYNC_API_REQUEST') && AD_SYNC_API_REQUEST) {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        exit(json_encode(['error' => 'Database is temporarily unavailable.'], JSON_UNESCAPED_SLASHES));
+    }
 
     // Development: show the actual database error
     exit('Database connection failed: ' . $exception->getMessage());

@@ -10,10 +10,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$apiUri = [Uri] $ApiUrl
+if (-not $apiUri.IsAbsoluteUri -or $apiUri.Scheme -ne 'https') {
+    throw 'ApiUrl must be an absolute HTTPS URL.'
+}
+
 Import-Module ActiveDirectory
 
-if ($Send -and [string]::IsNullOrWhiteSpace($env:AD_SYNC_TOKEN)) {
-    throw 'AD_SYNC_TOKEN must be configured in the process environment before using -Send.'
+if ($Send -and ([string]::IsNullOrWhiteSpace($env:AD_SYNC_TOKEN) -or $env:AD_SYNC_TOKEN.Length -lt 32)) {
+    throw 'AD_SYNC_TOKEN must be at least 32 characters and configured in the process environment before using -Send.'
 }
 
 $directoryComputers = Get-ADComputer `
@@ -88,6 +93,17 @@ foreach ($computer in $directoryComputers) {
             $null
         } else {
             $manufacturerSerial
+        }
+
+        $missingHardware = @()
+        if ([string]::IsNullOrWhiteSpace($manufacturer)) { $missingHardware += 'manufacturer' }
+        if ([string]::IsNullOrWhiteSpace($model)) { $missingHardware += 'model' }
+        if ([string]::IsNullOrWhiteSpace($processorName)) { $missingHardware += 'processor' }
+        if ($null -eq $ram) { $missingHardware += 'ram_gb' }
+        if ($null -eq $storage) { $missingHardware += 'storage_gb' }
+        if ($null -eq $manufacturerSerialValue) { $missingHardware += 'manufacturer_serial' }
+        if ($missingHardware.Count -gt 0) {
+            Write-Warning ("{0}: unavailable hardware fields will remain unknown: {1}" -f $computer.Name, ($missingHardware -join ', '))
         }
 
         $records.Add([pscustomobject]@{

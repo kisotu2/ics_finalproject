@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS ira_assets CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE ira_assets;
+CREATE DATABASE IF NOT EXISTS ira_assets_recovered CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE ira_assets_recovered;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,

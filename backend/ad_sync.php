@@ -8,6 +8,83 @@ function ad_sync_is_list(array $value): bool
     return $value === [] || array_keys($value) === range(0, count($value) - 1);
 }
 
+function ad_sync_record_label(mixed $record, int $index): string
+{
+    if (is_array($record) && isset($record['computer_name']) && is_string($record['computer_name'])) {
+        $name = preg_replace('/[^A-Za-z0-9._-]/', '', trim($record['computer_name']));
+        if ($name !== '') {
+            return substr($name, 0, 63);
+        }
+    }
+
+    return 'record ' . ($index + 1);
+}
+
+function validate_ad_sync_batch(array $payload): array
+{
+    if (!isset($payload['version']) || $payload['version'] !== 1) {
+        throw new InvalidArgumentException('Payload version must be 1.');
+    }
+    if (!isset($payload['computers']) || !is_array($payload['computers']) || !ad_sync_is_list($payload['computers'])) {
+        throw new InvalidArgumentException('Payload must contain a computers array.');
+    }
+
+    $input = $payload['computers'];
+    if (count($input) < 1 || count($input) > 500) {
+        throw new InvalidArgumentException('A sync must contain between 1 and 500 computers.');
+    }
+
+    $guidCounts = [];
+    $nameCounts = [];
+    foreach ($input as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $guidValue = $record['ad_guid'] ?? null;
+        $guid = is_string($guidValue) ? strtolower(trim($guidValue)) : '';
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $guid)) {
+            $guidCounts[$guid] = ($guidCounts[$guid] ?? 0) + 1;
+        }
+        $nameValue = $record['computer_name'] ?? null;
+        $name = is_string($nameValue) ? strtoupper(trim($nameValue)) : '';
+        if ($name !== '') {
+            $nameCounts[$name] = ($nameCounts[$name] ?? 0) + 1;
+        }
+    }
+
+    $records = [];
+    $failed = [];
+    foreach ($input as $index => $record) {
+        $label = ad_sync_record_label($record, $index);
+        if (is_array($record)) {
+            $guidValue = $record['ad_guid'] ?? null;
+            $nameValue = $record['computer_name'] ?? null;
+            $guid = is_string($guidValue) ? strtolower(trim($guidValue)) : '';
+            $name = is_string($nameValue) ? strtoupper(trim($nameValue)) : '';
+            if (($guidCounts[$guid] ?? 0) > 1) {
+                $failed[] = ['computer_name' => $label, 'message' => 'Duplicate AD object GUID in this batch.'];
+                continue;
+            }
+            if (($nameCounts[$name] ?? 0) > 1) {
+                $failed[] = ['computer_name' => $label, 'message' => 'Duplicate computer name in this batch.'];
+                continue;
+            }
+        }
+
+        try {
+            $validated = validate_ad_sync_payload([
+                'version' => 1,
+                'computers' => [$record],
+            ]);
+            $records[] = $validated[0];
+        } catch (InvalidArgumentException $exception) {
+            $failed[] = ['computer_name' => $label, 'message' => $exception->getMessage()];
+        }
+    }
+
+    return [$records, $failed];
+}
+
 function validate_ad_sync_payload(array $payload): array
 {
     if (!isset($payload['version']) || $payload['version'] !== 1) {
@@ -59,12 +136,18 @@ function validate_ad_sync_payload(array $payload): array
             }
         }
 
-        $guid = strtolower(trim((string) $record['ad_guid']));
+        if (!is_string($record['ad_guid'])) {
+            throw new InvalidArgumentException('Computer record ' . ($index + 1) . ' has an invalid AD object GUID.');
+        }
+        $guid = strtolower(trim($record['ad_guid']));
         if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $guid)) {
             throw new InvalidArgumentException('Computer record ' . ($index + 1) . ' has an invalid AD object GUID.');
         }
 
-        $computerName = trim((string) $record['computer_name']);
+        if (!is_string($record['computer_name'])) {
+            throw new InvalidArgumentException('Computer record ' . ($index + 1) . ' has an invalid computer name.');
+        }
+        $computerName = trim($record['computer_name']);
         if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/', $computerName)) {
             throw new InvalidArgumentException('Computer record ' . ($index + 1) . ' has an invalid computer name.');
         }
@@ -113,6 +196,16 @@ function validate_optional_date_value(mixed $value, string $field): ?string
     return $value;
 }
 
+function ad_sync_text_length(string $value): int
+{
+    if (function_exists('mb_strlen')) {
+        return mb_strlen($value, 'UTF-8');
+    }
+
+    $matched = preg_match_all('/./us', $value, $characters);
+    return $matched === false ? strlen($value) : $matched;
+}
+
 function validate_ad_text(mixed $value, string $field, int $maxLength, bool $nullable): ?string
 {
     if ($value === null && $nullable) {
@@ -128,7 +221,7 @@ function validate_ad_text(mixed $value, string $field, int $maxLength, bool $nul
         return null;
     }
 
-    if ($value === '' || mb_strlen($value, 'UTF-8') > $maxLength) {
+    if ($value === '' || ad_sync_text_length($value) > $maxLength) {
         throw new InvalidArgumentException($field . ' is required and must be at most ' . $maxLength . ' characters.');
     }
 
@@ -146,6 +239,86 @@ function validate_ad_integer(mixed $value, string $field, int $minimum, int $max
     }
 
     return $value;
+}
+
+function ad_sync_database_schema_issues(mysqli $conn): array
+{
+    $expected = [
+        'laptops' => [
+            'asset_tag' => 'varchar(80)', 'serial_number' => 'varchar(120)',
+            'manufacturer_serial' => 'varchar(120)', 'ad_object_guid' => 'char(36)',
+            'ad_computer_name' => 'varchar(63)', 'ad_distinguished_name' => 'varchar(1024)',
+            'ad_enabled' => 'tinyint(1)', 'ad_operating_system' => 'varchar(255)',
+            'ad_operating_system_version' => 'varchar(100)', 'ad_last_synced_at' => 'datetime(6)',
+            'brand' => 'varchar(100)', 'model' => 'varchar(120)', 'processor_description' => 'varchar(255)',
+            'ram_gb' => 'tinyint unsigned', 'storage_gb' => 'smallint unsigned',
+            'status' => "enum('available','assigned','maintenance','retired','disposed')",
+            'purchase_date' => 'date', 'warranty_expiry' => 'date',
+        ],
+        'ad_sync_events' => [
+            'id' => 'bigint', 'source_ip' => 'varchar(45)', 'received_count' => 'int unsigned',
+            'created_count' => 'int unsigned', 'updated_count' => 'int unsigned',
+            'failed_count' => 'int unsigned', 'created_at' => 'timestamp',
+        ],
+    ];
+    $issues = [];
+    foreach ($expected as $table => $columns) {
+        $stmt = $conn->prepare('SELECT column_name, column_type FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?');
+        $stmt->bind_param('s', $table);
+        $stmt->execute();
+        $actual = [];
+        foreach ($stmt->get_result() as $column) {
+            $actual[$column['column_name']] = strtolower((string) $column['column_type']);
+        }
+        foreach ($columns as $name => $type) {
+            if (!isset($actual[$name])) {
+                $issues[] = $table . '.' . $name . ' missing';
+            } elseif (($table === 'ad_sync_events' && $name === 'summary'
+                    && !in_array($actual[$name] ?? '', ['json', 'longtext'], true))
+                || (isset($actual[$name]) && $actual[$name] !== $type)) {
+                $issues[] = $table . '.' . $name . ' type mismatch';
+            }
+        }
+        if ($table === 'ad_sync_events') {
+            $hasSummary = isset($actual['summary']) && in_array($actual['summary'], ['json', 'longtext'], true);
+            if (!$hasSummary) {
+                $issues[] = 'ad_sync_events.summary missing or incompatible';
+            }
+        }
+    }
+
+    $requiredUnique = ['laptops' => ['asset_tag', 'serial_number', 'ad_object_guid']];
+    foreach ($requiredUnique as $table => $columns) {
+        foreach ($columns as $column) {
+            $stmt = $conn->prepare("SELECT COUNT(DISTINCT s.index_name) AS total
+                FROM information_schema.statistics s
+                WHERE s.table_schema = DATABASE() AND s.table_name = ?
+                  AND s.column_name = ? AND s.seq_in_index = 1 AND s.non_unique = 0
+                  AND (SELECT COUNT(*) FROM information_schema.statistics s2
+                       WHERE s2.table_schema = s.table_schema AND s2.table_name = s.table_name
+                         AND s2.index_name = s.index_name) = 1");
+            $stmt->bind_param('ss', $table, $column);
+            $stmt->execute();
+            if ((int) $stmt->get_result()->fetch_assoc()['total'] === 0) {
+                $issues[] = $table . '.' . $column . ' unique index missing';
+            }
+        }
+    }
+
+    $primary = $conn->query("SELECT COUNT(*) AS total FROM information_schema.key_column_usage
+        WHERE table_schema = DATABASE() AND table_name = 'ad_sync_events'
+          AND constraint_name = 'PRIMARY' AND column_name = 'id' AND ordinal_position = 1");
+    if ((int) $primary->fetch_assoc()['total'] === 0) {
+        $issues[] = 'ad_sync_events.id primary key missing';
+    }
+    $eventIndex = $conn->query("SELECT COUNT(*) AS total FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'ad_sync_events'
+          AND column_name = 'created_at' AND seq_in_index = 1");
+    if ((int) $eventIndex->fetch_assoc()['total'] === 0) {
+        $issues[] = 'ad_sync_events.created_at index missing';
+    }
+
+    return array_values(array_unique($issues));
 }
 
 function sync_ad_computer(mysqli $conn, array $record): array

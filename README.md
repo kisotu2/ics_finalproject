@@ -307,19 +307,19 @@ Migration filenames are provided as references; their existence and compatibilit
 
 ### XAMPP migration and initial setup
 
-For a fresh installation, import `database.sql`, create local configuration from `config.example.php`, install Composer packages with `composer install`, and complete the administrator setup. The fresh schema includes the Active Directory inventory fields.
+For a fresh installation, import `database.sql` (it creates `ira_assets_recovered`, matching `config.example.php`), create local configuration from `config.example.php`, install Composer packages with `composer install`, and complete the administrator setup. The fresh schema includes the Active Directory inventory fields.
 
 For an existing installation:
 
 1. Back up the configured database.
 2. Confirm the database contains the `laptops` table and has already received the other migrations required by this version.
-3. Apply `migrations/20261026_active_directory_inventory.sql` once using phpMyAdmin or the MySQL CLI, selecting the application's configured database. The migration uses `USE ira_assets`; if your configured database has another name, change that statement to the database you backed up.
+3. Apply `migrations/20261026_active_directory_inventory.sql` to `ira_assets_recovered` (the current local configuration). If your deployment uses another database name, change the migration's initial `USE` statement to that already-configured database after confirming the backup.
 4. Verify `laptops.ad_object_guid`, `laptops.manufacturer_serial`, `laptops.processor_description` and `ad_sync_events` exist before running the connector.
 5. Test migration and sync behavior in a staging copy before applying to production.
 
-The migration copies existing non-`IRA-LAP-` serial values into `manufacturer_serial`, then assigns database-ID-based internal serials to existing laptop rows. Manufacturer serials are deliberately not unique because endpoint data can be missing or duplicated.
+The migration copies a legacy serial into `manufacturer_serial` only when that field is empty, then assigns database-ID-based internal serials to rows still using legacy serials. Existing manufacturer serial values and already-generated `IRA-LAP-` inventory serials (including collision suffixes) are preserved. Manufacturer serials are deliberately not unique because endpoint data can be missing or duplicated.
 
-For an existing installation with the AD inventory schema already applied, back up the database and apply `migrations/20261027_virtual_laptop_portal.sql` once. Change its `USE ira_assets` statement to the configured database if required. It adds virtual display state, an optional responsible administrator, issue/update/notification tables, and an issue link on maintenance records. It does not delete or rewrite existing laptop or maintenance records. Restore the backup to roll back; do not drop new tables while they contain reports.
+For an existing installation with the AD inventory schema already applied, back up the database and apply `migrations/20261027_virtual_laptop_portal.sql` once. Change its initial `USE` statement to the configured database if required. It adds virtual display state, an optional responsible administrator, issue/update/notification tables, and an issue link on maintenance records. It does not delete or rewrite existing laptop or maintenance records. Restore the backup to roll back; do not drop new tables while they contain reports.
 
 ### Virtual laptop and issue review
 
@@ -363,10 +363,10 @@ After downloading the script (for example to `~/Downloads`), run it on the Mac u
   -AdGuid 'a6f33f8b-f62d-4acb-96be-8e1ef6ab0c21' \
   -DirectoryComputerName 'MAC-ACCOUNTING-01' \
   -DistinguishedName 'CN=MAC-ACCOUNTING-01,OU=Macs,DC=example,DC=com' \
-  -Enabled
+  -Enabled $true
 ```
 
-The `-Enabled` switch indicates the AD object is enabled; omit it if IT confirms that it is disabled. The default is preview-only and does not require the token. Review the displayed hardware and AD identity. To submit, rerun the same command with `-Send`. Replace the example identity only with values confirmed by IT for this Mac. The script reads `AD_SYNC_TOKEN` from its process environment only when `-Send` is specified; IT must provision it securely and must not place it in the command, script, or a shared download. The application currently accepts the server-configured sync token, not per-device credentials, so access to that token must remain restricted to authorized administrators and devices. Configure VPN/network allowlisting and HTTPS as required by the server policy.
+Provide `-Enabled $true` or `-Enabled $false` to match the AD object. This required value prevents a missing switch from silently marking an enabled Mac as disabled. The default is preview-only and does not require the token. Review the displayed hardware and AD identity. To submit, rerun the same command with `-Send`. Replace the example identity only with values confirmed by IT for this Mac. The script reads `AD_SYNC_TOKEN` from its process environment only when `-Send` is specified; IT must provision it securely and must not place it in the command, script, or a shared download. The application currently accepts the server-configured sync token, not per-device credentials, so access to that token must remain restricted to authorized administrators and devices. Configure VPN/network allowlisting and HTTPS as required by the server policy.
 
 ### Secure endpoint configuration
 
@@ -384,9 +384,11 @@ openssl rand -base64 48
 
 Configure the same generated value as an environment variable for Apache/PHP and for the authorized connector process, using the operating system's protected secret-management mechanism. Do not paste it into project files, shell history, a URL, logs, or the connector script. For XAMPP, Apache may need to be restarted after changing its environment. Keep local configuration files private and outside source control.
 
-At the network layer, restrict the endpoint to the connector's fixed source address and configure TLS. An Apache 2.4 example is provided in `docs/apache-ad-sync-location.conf.example`; replace its documentation-only IP address with the actual trusted connector address and install it in the applicable VirtualHost. Also restrict the path using the host firewall. Do not expose this endpoint to the public Internet.
+At the network layer, restrict the endpoint to the connector's fixed source address and configure TLS. For a direct connector, Apache and the host firewall allowlist the connector; behind a proxy, Apache allowlists the proxy and the proxy/firewall must separately allowlist the connector. An Apache 2.4 example is provided in `docs/apache-ad-sync-location.conf.example`; replace its documentation-only IP address with the actual trusted connector address and install it in the applicable VirtualHost. Also restrict the path using the host firewall. Do not expose this endpoint to the public Internet. On this XAMPP installation, the `httpd-vhosts.conf` include is commented out in `xamppfiles/etc/httpd.conf`, while the default TLS VirtualHost is in `xamppfiles/etc/extra/httpd-ssl.conf`. Either enable and configure an HTTPS vhost in `httpd-vhosts.conf`, or place the provided `<LocationMatch>` block inside the active `<VirtualHost _default_:443>` in `httpd-ssl.conf`; replace the sample address, ensure the SSL include is enabled when Apache starts, then restart Apache. Keep environment directives in an untracked, administrator-only Apache configuration file (or use a protected service environment): `SetEnv AD_SYNC_TOKEN "<secret>"`. If running local-only development, add `SetEnv AD_SYNC_ALLOW_INSECURE_LOCAL "1"` only to the local configuration and remove it before deployment. For a trusted TLS proxy, add `SetEnv AD_SYNC_TRUSTED_PROXY_IPS "<proxy-ip>"` and ensure it overwrites the forwarded scheme header rather than passing client input through.
 
 For local-only XAMPP development, HTTP is accepted solely from `127.0.0.1` or `::1` when `AD_SYNC_ALLOW_INSECURE_LOCAL=1` is set. This development exception is not appropriate for a domain connector or production deployment.
+
+If TLS terminates at a reverse proxy, set `AD_SYNC_TRUSTED_PROXY_IPS` to the immediate proxy's fixed IP address or addresses and have it send `X-Forwarded-Proto: https`. The PHP endpoint trusts that header only when `REMOTE_ADDR` exactly matches this explicit list; do not trust forwarded headers from arbitrary clients. The API also limits authenticated calls to 30 requests per immediate peer per minute and accepts at most 500 computers/2 MiB per request. The example Apache location rule allowlists a fixed connector address; apply the same restriction in the host firewall. Rotate any token that was exposed during troubleshooting before production, and restart Apache after changing the environment.
 
 ### Preview and send
 
@@ -398,14 +400,23 @@ On the domain-joined Windows host, open PowerShell with the Active Directory mod
   -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php'
 ```
 
-The default is preview-only; it queries online hardware and reports offline computers but sends nothing. After reviewing the preview and confirming the network/TLS configuration, expose the token to that connector process through its protected environment and explicitly send:
+The default is preview-only; it queries online hardware and reports offline computers but sends nothing. After reviewing the preview and confirming the network/TLS configuration, securely prompt for the token and run the send in that same PowerShell session (or provision it with approved device-management secret storage):
 
 ```powershell
-.\scripts\Sync-ActiveDirectoryInventory.ps1 `
-  -SearchBase 'OU=Workstations,DC=example,DC=com' `
-  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php' `
-  -Send
+$secureToken = Read-Host 'AD sync token' -AsSecureString
+$tokenPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+try {
+    $env:AD_SYNC_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPointer)
+    .\scripts\Sync-ActiveDirectoryInventory.ps1 `
+      -SearchBase 'OU=Workstations,DC=example,DC=com' `
+      -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php' `
+      -Send
+} finally {
+    Remove-Item Env:AD_SYNC_TOKEN -ErrorAction SilentlyContinue
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPointer)
+}
 ```
+
 
 The connector sends batches of up to 100 records. A JSON record has this shape:
 
@@ -444,7 +455,7 @@ php tests/ad_sync_validation_test.php
 bash tests/ad_sync_http_test.sh
 ```
 
-The HTTP boundary test starts a temporary localhost PHP server and checks invalid/missing tokens, malformed JSON, missing fields, and a future purchase date. Database idempotency/serial-collision, production HTTPS, unauthorized-page, and Windows endpoint scenarios are listed in [`tests/AD_SYNC_TEST_PLAN.md`](tests/AD_SYNC_TEST_PLAN.md); they require an isolated test database and/or a configured Windows domain. Do not run them against production.
+The HTTP boundary test starts a temporary localhost PHP server and checks method restrictions, invalid/missing tokens, malformed JSON, content type, invalid records, and future purchase dates. Record-level validation failures return HTTP 207 while valid records in the same batch continue. Database idempotency/serial-collision, production HTTPS, unauthorized-page, and Windows endpoint scenarios are listed in [`tests/AD_SYNC_TEST_PLAN.md`](tests/AD_SYNC_TEST_PLAN.md); they require an isolated test database and/or a configured Windows domain. Do not run them against production.
 
 ## Running the Flask API
 

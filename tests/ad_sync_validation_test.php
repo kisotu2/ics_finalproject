@@ -98,4 +98,31 @@ $futureWarranty = validate_ad_sync_payload([
 ]);
 assert_true($futureWarranty[0]['warranty_expiry'] === '2099-12-31', 'Future warranty expiry must remain valid.');
 
+$invalidGuidRecord = valid_record();
+$invalidGuidRecord['computer_name'] = 'WS-INVALID-01';
+$invalidGuidRecord['ad_guid'] = 'not-a-guid';
+[$partialRecords, $partialFailures] = validate_ad_sync_batch([
+    'version' => 1,
+    'computers' => [valid_record(), $invalidGuidRecord],
+]);
+assert_true(count($partialRecords) === 1, 'A malformed computer must not block a valid peer.');
+assert_true(count($partialFailures) === 1, 'The malformed computer must be reported as failed.');
+assert_true(str_contains($partialFailures[0]['message'], 'invalid AD object GUID'), 'The failure should identify the GUID problem.');
+
+$duplicateA = valid_record();
+$duplicateB = valid_record();
+$duplicateB['computer_name'] = 'WS-ACCOUNTING-02';
+[$duplicateRecords, $duplicateFailures] = validate_ad_sync_batch([
+    'version' => 1,
+    'computers' => [$duplicateA, $duplicateB],
+]);
+assert_true(count($duplicateRecords) === 0, 'Duplicate AD GUIDs must not be synchronized.');
+assert_true(count($duplicateFailures) === 2, 'Both duplicate identities must be reported.');
+assert_true(ad_sync_text_length('設備A') === 3, 'UTF-8 character limits must count characters.');
+
+$wrongTypeRecord = valid_record();
+$wrongTypeRecord['ad_guid'] = ['unexpected'];
+[$typedRecords, $typedFailures] = validate_ad_sync_batch(['version' => 1, 'computers' => [$wrongTypeRecord]]);
+assert_true($typedRecords === [] && count($typedFailures) === 1, 'Wrongly typed fields must fail cleanly without warnings.');
+
 fwrite(STDOUT, 'Passed ' . $tests . " AD sync validation tests.\n");

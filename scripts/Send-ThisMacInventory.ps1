@@ -16,7 +16,8 @@ param(
     [ValidateNotNullOrEmpty()]
     [string] $DistinguishedName,
 
-    [switch] $Enabled,
+    [Parameter(Mandatory = $true)]
+    [bool] $Enabled,
 
     [string] $DirectoryOperatingSystem,
 
@@ -134,11 +135,21 @@ if ([string]::IsNullOrWhiteSpace($processor)) {
     $processor = $null
 }
 
+$missingHardware = @()
+if ([string]::IsNullOrWhiteSpace($manufacturerSerial)) { $missingHardware += 'manufacturer_serial' }
+if ($null -eq $model) { $missingHardware += 'model' }
+if ($null -eq $processor) { $missingHardware += 'processor' }
+if ($null -eq $ramGb) { $missingHardware += 'ram_gb' }
+if ($null -eq $storageGb) { $missingHardware += 'storage_gb' }
+if ($missingHardware.Count -gt 0) {
+    Write-Warning ("Unavailable local hardware fields will be sent as null: {0}" -f ($missingHardware -join ', '))
+}
+
 $record = [pscustomobject]@{
     ad_guid = $AdGuid.ToLowerInvariant()
     computer_name = $DirectoryComputerName
     distinguished_name = $DistinguishedName
-    enabled = $Enabled.IsPresent
+    enabled = $Enabled
     operating_system = $operatingSystemName
     operating_system_version = $operatingSystemVersion
     manufacturer = 'Apple'

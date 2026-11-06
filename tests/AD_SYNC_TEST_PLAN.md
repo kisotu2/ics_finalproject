@@ -6,7 +6,7 @@ The validation test script covers record shape, missing fields, malformed JSON d
 php tests/ad_sync_validation_test.php
 ```
 
-Database and Windows-domain scenarios below require an isolated test database, a configured test endpoint, and (for the offline case) a domain-connected Windows host. Do not run integration checks against production data.
+Database and Windows-domain scenarios below require an isolated test database, a configured test endpoint, and (for the offline case) a domain-connected Windows host. The API applies a 30-request-per-peer-per-minute limit; run rate-limit tests with a unique source or allow the window to expire. Do not run integration checks against production data.
 
 | ID | Scenario | Steps | Expected result |
 |---|---|---|---|
@@ -14,7 +14,7 @@ Database and Windows-domain scenarios below require an isolated test database, a
 | AD-02 | Repeated sync | Submit the same `ad_guid` twice, changing a hardware field on the second request. | The same laptop row and inventory serial are retained; its hardware values and last-sync timestamp update; no duplicate laptop is created. |
 | AD-03 | Invalid token | Submit an otherwise valid request with a wrong bearer token. | HTTP 401; no laptop or successful sync event is written; rejection is recorded in the PHP server log. |
 | AD-04 | Malformed JSON | Submit a truncated JSON body with the correct token and HTTPS. | HTTP 400 with a JSON error; no database changes. |
-| AD-05 | Missing fields | Remove `ad_guid` or another required field from one computer record. | HTTP 422 identifies the missing field; no records from that payload are synchronized. |
+| AD-05 | Missing fields | Remove `ad_guid` or another required field from one computer record in a batch with a valid peer. | HTTP 207 reports the record-level validation error and still processes the valid peer. An all-invalid batch returns HTTP 422 and failure details without changing inventory; mixed valid/invalid batches are logged with partial-failure counts. |
 | AD-06 | Duplicate inventory serial | In the isolated database, read the next auto-increment ID `N`, insert a blocker row with serial `IRA-LAP-(N+1)`, then sync a new computer (which receives ID `N+1`). | The new row receives the deterministic `IRA-LAP-(N+1)-1` suffix; the reserved row is unchanged. |
 | AD-07 | Offline computer | Include an offline AD computer in the connector's search OU, then run preview and send. | PowerShell reports it as unreachable and omits it; the API does not delete or mark an existing laptop as retired. |
 | AD-08 | Future purchase date | Submit a purchase date later than the server date, then submit a future warranty-expiry date. | Future purchase date returns HTTP 422; future warranty expiry is accepted. |

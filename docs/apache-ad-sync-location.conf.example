@@ -5,3 +5,8 @@
 </LocationMatch>
 
 # Configure TLS for that same VirtualHost. Do not expose the endpoint over plain HTTP.
+
+# When TLS terminates at a reverse proxy, keep PHP behind that proxy and configure the
+# immediate proxy address in AD_SYNC_TRUSTED_PROXY_IPS (comma-separated IP literals).
+# Only that configured peer may supply X-Forwarded-Proto: https; do not set a global
+# SetEnvIf rule that trusts the header from arbitrary clients.

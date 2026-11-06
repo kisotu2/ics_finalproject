@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/backend/ad_sync_security.php';
+
 const AD_SYNC_MAX_BODY_BYTES = 2097152;
 
 function ad_sync_respond(int $status, array $body): void
@@ -25,24 +27,29 @@ function ad_sync_authorization_header(): string
     return '';
 }
 
-function ad_sync_is_secure_transport(): bool
-{
-    if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
-        return true;
-    }
 
-    return getenv('AD_SYNC_ALLOW_INSECURE_LOCAL') === '1'
-        && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST');
+    ad_sync_respond(405, ['error' => 'Only POST requests are accepted.']);
 }
 
 $expectedToken = getenv('AD_SYNC_TOKEN');
-if ($expectedToken === false || strlen($expectedToken) < 32) {
+if ($expectedToken === false || strlen($expectedToken) < 32 || preg_match('/\s/', $expectedToken)) {
     error_log('AD sync rejected: AD_SYNC_TOKEN is not configured with at least 32 characters.');
     ad_sync_respond(503, ['error' => 'AD sync is not configured.']);
 }
 
 if (!ad_sync_is_secure_transport()) {
     ad_sync_respond(400, ['error' => 'HTTPS is required for directory synchronization.']);
+}
+
+$rateAllowed = ad_sync_rate_limit((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+if ($rateAllowed === null) {
+    ad_sync_respond(503, ['error' => 'Request throttling is temporarily unavailable.']);
+}
+if (!$rateAllowed) {
+    header('Retry-After: 60');
+    ad_sync_respond(429, ['error' => 'Request rate limit exceeded; retry after 60 seconds.']);
 }
 
 $providedHeader = ad_sync_authorization_header();
@@ -79,16 +86,32 @@ if (!is_array($payload) || ($payload !== [] && array_keys($payload) === range(0,
 require_once __DIR__ . '/backend/ad_sync.php';
 
 try {
-    $records = validate_ad_sync_payload($payload);
+    [$records, $failed] = validate_ad_sync_batch($payload);
 } catch (InvalidArgumentException $exception) {
     ad_sync_respond(422, ['error' => $exception->getMessage()]);
 }
 
+if ($records === []) {
+    ad_sync_respond(422, [
+        'status' => 'failed',
+        'total_received' => count($payload['computers']),
+        'created' => 0,
+        'updated' => 0,
+        'failed' => count($failed),
+        'errors' => $failed,
+    ]);
+}
+
+define('AD_SYNC_API_REQUEST', true);
 require __DIR__ . '/db.php';
+$schemaIssues = ad_sync_database_schema_issues($conn);
+if ($schemaIssues !== []) {
+    error_log('AD sync schema check failed: ' . implode(', ', $schemaIssues));
+    ad_sync_respond(503, ['error' => 'AD sync database schema is incomplete or incompatible. Apply the migration and check the administrator dashboard.']);
+}
 
 $created = 0;
 $updated = 0;
-$failed = [];
 $missingManufacturerSerials = [];
 $serialCounts = [];
 
@@ -148,7 +171,9 @@ foreach ($records as $record) {
     }
 }
 
+$received = count($payload['computers']);
 $summary = [
+    'total_received' => $received,
     'created' => $created,
     'updated' => $updated,
     'failed' => count($failed),
@@ -161,7 +186,7 @@ try {
     log_ad_sync_event(
         $conn,
         substr((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 0, 45),
-        count($records),
+        $received,
         $summary
     );
 } catch (Throwable $exception) {

@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $uri = [Uri] $ApiUrl
-if ($uri.Scheme -ne 'https') {
+if (-not $uri.IsAbsoluteUri -or $uri.Scheme -ne 'https') {
     throw 'ApiUrl must use HTTPS.'
 }
 
