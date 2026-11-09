@@ -36,6 +36,8 @@ $serial = $readPostString('serial_number');
 $brand = $readPostString('brand');
 $model = $readPostString('model');
 $status = $readPostString('status');
+$weightInput = $readPostString('weight_kg');
+$screenSizeInput = $readPostString('screen_size_inches');
 $allowedStatuses = $category === 'Laptop'
     ? ['Available', 'Maintenance', 'Retired', 'Disposed']
     : ['Active', 'Faulty', 'Retired'];
@@ -61,8 +63,13 @@ $transactionStarted = false;
 try {
     $conn->begin_transaction();
     $transactionStarted = true;
+    $weightKg = null;
+    $screenSizeInches = null;
     if ($category === 'Laptop') {
-        $assetTag = next_laptop_asset_tag($conn);
+        $assetTag = $readPostString('asset_tag');
+        $weightKg = parse_laptop_measurement($weightInput, 0.5, 8.0, 'Laptop weight');
+        $screenSizeInches = parse_laptop_measurement($screenSizeInput, 10.0, 20.0, 'Screen size');
+        claim_laptop_asset_tag($conn, $assetTag);
     }
 
     $check = $conn->prepare("SELECT id FROM $table WHERE asset_tag = ? OR serial_number = ? LIMIT 1 FOR UPDATE");
@@ -72,27 +79,55 @@ try {
     $check->close();
 
     if ($exists) {
+        $conn->rollback();
+        $transactionStarted = false;
         http_response_code(409);
         $response['message'] = 'An asset with that tag or serial number already exists.';
         echo json_encode($response);
         exit;
     }
 
-    $stmt = $conn->prepare(
-        "INSERT INTO $table (asset_tag, serial_number, brand, model, status, assigned_to)
-         VALUES (?, ?, ?, ?, ?, NULL)"
-    );
-    $stmt->bind_param('sssss', $assetTag, $serial, $brand, $model, $status);
+    if ($category === 'Laptop') {
+        $stmt = $conn->prepare(
+            "INSERT INTO $table
+                (asset_tag, serial_number, brand, model, status, assigned_to, weight_kg, screen_size_inches)
+             VALUES (?, ?, ?, ?, ?, NULL, ?, ?)"
+        );
+        $stmt->bind_param('sssssdd', $assetTag, $serial, $brand, $model, $status, $weightKg, $screenSizeInches);
+    } else {
+        $stmt = $conn->prepare(
+            "INSERT INTO $table (asset_tag, serial_number, brand, model, status, assigned_to)
+             VALUES (?, ?, ?, ?, ?, NULL)"
+        );
+        $stmt->bind_param('sssss', $assetTag, $serial, $brand, $model, $status);
+    }
     $stmt->execute();
+    $newAssetId = (int) $stmt->insert_id;
+    if ($category === 'Laptop') {
+        record_laptop_asset_tag_assignment($conn, $assetTag, $newAssetId);
+    }
     $response['success'] = true;
     $response['message'] = 'Asset added successfully.';
-    $response['id'] = $stmt->insert_id;
+    $response['id'] = $newAssetId;
+    $response['asset_tag'] = $assetTag;
     if ($category === 'Laptop') {
-        audit($conn, 'laptop_registered', 'laptop', (int) $stmt->insert_id, ['asset_tag' => $assetTag]);
+        audit($conn, 'laptop_registered', 'laptop', $newAssetId, ['asset_tag' => $assetTag]);
     }
     $stmt->close();
     $conn->commit();
     $transactionStarted = false;
+    echo json_encode($response);
+} catch (InvalidArgumentException $exception) {
+    if ($transactionStarted) {
+        $conn->rollback();
+    }
+    http_response_code(409);
+    $response['message'] = $exception->getMessage();
+    try {
+        $response['asset_tag'] = next_laptop_asset_tag($conn);
+    } catch (RuntimeException $poolException) {
+        $response['message'] .= ' ' . $poolException->getMessage();
+    }
     echo json_encode($response);
 } catch (mysqli_sql_exception $exception) {
     if ($transactionStarted) {

@@ -2,15 +2,19 @@
 
 Run these checks only against an isolated test database after applying
 `migrations/20261027_virtual_laptop_portal.sql` and
+`migrations/20261109_laptop_asset_tags_and_portability.sql` and
 `migrations/20261109_software_expiry_notifications.sql` when needed. Configure
 SMTP in `config.php` before running the licence reminder cases. Do not run
 destructive checks against production data.
 
 | ID | Scenario | Expected result |
 |---|---|---|
-| INV-01 | Manual laptop registration | An administrator registers a laptop with valid identifiers and inventory details; the dashboard shows the new asset. Duplicate asset tags and serial numbers are rejected. |
-| INV-02 | Automatic asset tags | Register laptops repeatedly, including with a gap in existing `IRA-LAP-###` values; the next saved laptop receives the first unused tag and no duplicate is created. |
+| INV-01 | Manual laptop registration | An administrator registers a laptop with valid identifiers and inventory details; the dashboard shows the new asset. Duplicate serial numbers are rejected. |
+| INV-02 | Asset tag pool | The form displays an available tag from `laptop_asset_tag_pool`; saving claims that tag, links it to the laptop, and a second registration receives a different tag. Existing occupied tags are never suggested. |
 | INV-03 | Manual laptop update | An administrator edits an existing laptop; inventory details update while its assignment and lifecycle status remain unchanged. |
+| INV-04 | Laptop portability data | Register or edit laptop weight and screen size; valid measurements persist and invalid/out-of-range values are rejected. |
+| REC-01 | Manager portability ranking | With otherwise comparable available devices, a manager/senior-rank recommendation ranks the lighter device with a screen no larger than 14 inches higher than a heavier or larger device. |
+| REC-02 | Missing portability data | A manager/senior-rank recommendation shows missing measurements and does not award their portability points; non-senior role scores remain based on the existing needs profile. |
 | VP-01 | Employee device privacy | An employee sees only assigned laptops; requesting another employee's laptop by ID returns an unavailable response and reveals no asset details. |
 | VP-02 | Virtual power state | A permitted user toggles the virtual display; the state persists after reload, an audit/history entry is recorded, and the laptop's actual status and assignment remain unchanged. Invalid CSRF tokens are rejected. |
 | VP-03 | Issue report | An assigned employee submits a valid report; it enters `pending_admin_review`, the employee and responsible administrator are notified, and the laptop status remains unchanged. |

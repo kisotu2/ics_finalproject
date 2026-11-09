@@ -15,7 +15,7 @@ if ($laptopId === false || ($laptopId !== null && $laptopId < 1)) {
 $isEdit = $laptopId !== null;
 $error = '';
 $transactionStarted = false;
-$generatedAssetTag = null;
+$generatedAssetTag = $isEdit ? null : next_laptop_asset_tag($conn);
 $values = [
     'serial_number' => '',
     'brand' => '',
@@ -24,11 +24,14 @@ $values = [
     'status' => 'Available',
     'purchase_date' => '',
     'warranty_expiry' => '',
+    'weight_kg' => '',
+    'screen_size_inches' => '',
 ];
 
 if ($isEdit) {
     $existingStmt = $conn->prepare(
-        'SELECT asset_tag, serial_number, brand, model, department, status, purchase_date, warranty_expiry
+        'SELECT asset_tag, serial_number, brand, model, department, status, purchase_date, warranty_expiry,
+                weight_kg, screen_size_inches
          FROM laptops WHERE id = ?'
     );
     $existingStmt->bind_param('i', $laptopId);
@@ -47,6 +50,15 @@ if ($isEdit) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
+
+    if (!$isEdit) {
+        $tagInput = $_POST['asset_tag'] ?? '';
+        if (!is_string($tagInput)) {
+            $error = 'The assigned asset tag is invalid. Reload the page and try again.';
+        } else {
+            $generatedAssetTag = trim($tagInput);
+        }
+    }
 
     foreach (array_keys($values) as $field) {
         if ($isEdit && $field === 'status') {
@@ -76,6 +88,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (mb_strlen($values['department'], 'UTF-8') > 120) {
             throw new InvalidArgumentException('Department must be 120 characters or fewer.');
         }
+        $weightKg = parse_laptop_measurement($values['weight_kg'], 0.5, 8.0, 'Laptop weight');
+        $screenSizeInches = parse_laptop_measurement($values['screen_size_inches'], 10.0, 20.0, 'Screen size');
         if (!$isEdit && !in_array($values['status'], ['Available', 'Maintenance', 'Retired', 'Disposed'], true)) {
             throw new InvalidArgumentException('Choose a valid laptop status.');
         }
@@ -88,34 +102,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $conn->prepare(
                 'UPDATE laptops
                  SET serial_number = ?, brand = ?, model = ?,
-                     department = NULLIF(?, \'\'), purchase_date = ?, warranty_expiry = ?
+                     department = NULLIF(?, \'\'), purchase_date = ?, warranty_expiry = ?,
+                     weight_kg = ?, screen_size_inches = ?
                  WHERE id = ?'
             );
             $stmt->bind_param(
-                'ssssssi',
+                'ssssssddi',
                 $values['serial_number'],
                 $values['brand'],
                 $values['model'],
                 $values['department'],
                 $purchaseDate,
                 $warrantyExpiry,
+                $weightKg,
+                $screenSizeInches,
                 $laptopId
             );
         } else {
-            $generatedAssetTag = next_laptop_asset_tag($conn);
+            claim_laptop_asset_tag($conn, (string) $generatedAssetTag);
             $stmt = $conn->prepare(
                 'INSERT INTO laptops
-                    (asset_tag, serial_number, brand, model, department, status, purchase_date, warranty_expiry)
-                 VALUES (?, ?, ?, ?, NULLIF(?, \'\'), ?, ?, ?)'
+                    (asset_tag, serial_number, brand, model, department, status, weight_kg,
+                     screen_size_inches, purchase_date, warranty_expiry)
+                 VALUES (?, ?, ?, ?, NULLIF(?, \'\'), ?, ?, ?, ?, ?)'
             );
             $stmt->bind_param(
-                'ssssssss',
+                'ssssssddss',
                 $generatedAssetTag,
                 $values['serial_number'],
                 $values['brand'],
                 $values['model'],
                 $values['department'],
                 $values['status'],
+                $weightKg,
+                $screenSizeInches,
                 $purchaseDate,
                 $warrantyExpiry
             );
@@ -123,6 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
         if (!$isEdit) {
             $laptopId = (int) $stmt->insert_id;
+            record_laptop_asset_tag_assignment($conn, (string) $generatedAssetTag, $laptopId);
         }
         $stmt->close();
 
@@ -135,7 +156,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: dashboard.php');
         exit;
     } catch (InvalidArgumentException $exception) {
+        if ($transactionStarted) {
+            $conn->rollback();
+            $transactionStarted = false;
+        }
         $error = $exception->getMessage();
+        if (!$isEdit) {
+            $generatedAssetTag = next_laptop_asset_tag($conn);
+        }
     } catch (mysqli_sql_exception $exception) {
         if ($transactionStarted) {
             $conn->rollback();
@@ -164,9 +192,10 @@ layout_start($isEdit ? 'Edit Laptop' : 'Register Laptop');
     <form method="post" class="form-grid">
         <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
         <?php if ($isEdit): ?>
-            <p><strong>Asset tag:</strong> <?= e($generatedAssetTag) ?> <span class="muted">(assigned automatically)</span></p>
+            <p><strong>Asset tag:</strong> <code><?= e($generatedAssetTag) ?></code></p>
         <?php else: ?>
-            <p><strong>Asset tag:</strong> assigned automatically when this laptop is saved.</p>
+            <p><strong>Asset tag:</strong> <code><?= e($generatedAssetTag) ?></code></p>
+            <input type="hidden" name="asset_tag" value="<?= e($generatedAssetTag) ?>">
         <?php endif; ?>
         <label>Serial number
             <input name="serial_number" maxlength="120" value="<?= e($values['serial_number']) ?>" required>
@@ -176,6 +205,12 @@ layout_start($isEdit ? 'Edit Laptop' : 'Register Laptop');
         </label>
         <label>Model
             <input name="model" maxlength="120" value="<?= e($values['model']) ?>" required>
+        </label>
+        <label>Weight (kg)
+            <input type="number" name="weight_kg" min="0.5" max="8" step="0.01" value="<?= e($values['weight_kg']) ?>">
+        </label>
+        <label>Screen size (inches)
+            <input type="number" name="screen_size_inches" min="10" max="20" step="0.1" value="<?= e($values['screen_size_inches']) ?>">
         </label>
         <label>Department
             <input name="department" maxlength="120" value="<?= e($values['department']) ?>">

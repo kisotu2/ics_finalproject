@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS laptops (
     processor_description VARCHAR(255) NULL,
     ram_gb TINYINT UNSIGNED NULL DEFAULT NULL,
     storage_gb SMALLINT UNSIGNED NULL DEFAULT NULL,
+    weight_kg DECIMAL(5,2) NULL,
+    screen_size_inches DECIMAL(4,1) NULL,
     assigned_to INT NULL,
     responsible_admin_id INT NULL,
     virtual_power_state ENUM('on','off') NOT NULL DEFAULT 'off',
@@ -40,6 +42,35 @@ CREATE TABLE IF NOT EXISTS laptops (
     CONSTRAINT fk_laptop_user FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_laptop_responsible_admin FOREIGN KEY (responsible_admin_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS laptop_asset_tag_pool (
+    asset_tag VARCHAR(80) PRIMARY KEY,
+    is_assigned TINYINT(1) NOT NULL DEFAULT 0,
+    laptop_id INT NULL UNIQUE,
+    assigned_at TIMESTAMP NULL DEFAULT NULL,
+    INDEX idx_laptop_asset_tag_pool_available (is_assigned, asset_tag),
+    CONSTRAINT fk_laptop_asset_tag_pool_laptop
+        FOREIGN KEY (laptop_id) REFERENCES laptops(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO laptop_asset_tag_pool (asset_tag)
+SELECT CONCAT('IRA-LAP-', LPAD(tag_number, 3, '0'))
+FROM (
+    SELECT ones.digit + (tens.digit * 10) + (hundreds.digit * 100) + 1 AS tag_number
+    FROM (
+        SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+    ) AS ones
+    CROSS JOIN (
+        SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+    ) AS tens
+    CROSS JOIN (
+        SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+        UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+    ) AS hundreds
+) AS available_numbers
+WHERE tag_number <= 500;
 
 CREATE TABLE IF NOT EXISTS laptop_issues (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -6,8 +6,10 @@ ini_set('display_startup_errors', '1');
 
 require __DIR__ . '/bootstrap.php';
 require_login(['super_admin']);
+require_once __DIR__ . '/backend/laptop_inventory.php';
 
 $message = "";
+$nextLaptopAssetTag = next_laptop_asset_tag($conn);
 
 /* ===============================
 FUNCTION TO DISPLAY ASSET ROW
@@ -373,10 +375,12 @@ function filterAssets(type){
         <h3>Add New Asset</h3>
         <form id="addAssetForm">
             <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
-            <input type="text" name="asset_tag" id="assetTag" placeholder="Asset Tag" required>
+            <input type="text" name="asset_tag" id="assetTag" value="<?= e($nextLaptopAssetTag) ?>" placeholder="Asset Tag" readonly required>
             <input type="text" name="serial_number" placeholder="Serial Number" required>
             <input type="text" name="brand" placeholder="Brand" required>
             <input type="text" name="model" placeholder="Model" required>
+            <input class="laptop-spec-field" type="number" name="weight_kg" min="0.5" max="8" step="0.01" placeholder="Weight (kg)">
+            <input class="laptop-spec-field" type="number" name="screen_size_inches" min="10" max="20" step="0.1" placeholder="Screen size (inches)">
             <select name="status" id="assetStatus" required>
                 <option value="Available">Available</option>
                 <option value="Maintenance">Maintenance</option>
@@ -441,8 +445,11 @@ function updateAssetStatuses(){
     status.replaceChildren(...options.map(value => new Option(value, value)));
     assetTag.required = category !== 'Laptop';
     assetTag.readOnly = category === 'Laptop';
-    assetTag.placeholder = category === 'Laptop' ? 'Generated automatically on save' : 'Asset Tag';
-    assetTag.value = '';
+    assetTag.placeholder = category === 'Laptop' ? 'Assigned from the tag inventory' : 'Asset Tag';
+    assetTag.value = category === 'Laptop' ? <?= json_encode($nextLaptopAssetTag) ?> : '';
+    document.querySelectorAll('.laptop-spec-field').forEach(field => {
+        field.hidden = category !== 'Laptop';
+    });
 }
 
 document.querySelector('#addAssetForm [name="category"]').addEventListener('change', updateAssetStatuses);
@@ -459,6 +466,9 @@ document.getElementById('addAssetForm').addEventListener('submit', function(e){
             const msg = document.getElementById('assetMessage');
             msg.textContent = data.message;
             msg.style.color = data.success ? 'green' : 'red';
+            if (data.asset_tag) {
+                document.getElementById('assetTag').value = data.asset_tag;
+            }
             if(data.success){
                 window.location.reload();
             }
