@@ -14,8 +14,8 @@ if (!$portalReady) {
     ?>
     <section class="panel laptop-empty">
         <h1>My Laptop setup required</h1>
-        <p>The virtual laptop portal is not enabled yet. An administrator must back up the database and apply <code>migrations/20261027_virtual_laptop_portal.sql</code> and <code>migrations/20261106_ad_endpoint_monitoring.sql</code>.</p>
-        <?php if ($isAdmin): ?><a class="button" href="directory_sync.php">Open directory sync</a><?php endif; ?>
+        <p>The virtual laptop portal is not enabled yet. An administrator must back up the database and apply <code>migrations/20261027_virtual_laptop_portal.sql</code>.</p>
+        <?php if ($isAdmin): ?><a class="button" href="add_laptop.php">Register a laptop</a><?php endif; ?>
     </section>
     <?php
     layout_end();
@@ -248,7 +248,7 @@ layout_start('My Laptop');
             <div class="laptop-empty-mark">—</div>
             <h2>No laptop assigned yet</h2>
             <p>Your assigned company laptop will appear here. If you believe this is a mistake, contact your system administrator.</p>
-            <?php if ($isAdmin): ?><a class="button" href="directory_sync.php">Open directory inventory</a><?php endif; ?>
+            <?php if ($isAdmin): ?><a class="button" href="add_laptop.php">Register a laptop</a><?php endif; ?>
         </section>
     <?php elseif ($selectedLaptop === null): ?>
         <section class="panel laptop-empty">
@@ -263,7 +263,7 @@ layout_start('My Laptop');
                 <select id="laptop-select" name="id" onchange="this.form.submit()">
                     <?php foreach ($laptops as $laptop): ?>
                         <option value="<?= (int) $laptop['id'] ?>" <?= (int) $laptop['id'] === (int) $selectedLaptop['id'] ? 'selected' : '' ?>>
-                            <?= e($laptop['asset_tag'] . ' · ' . ($laptop['ad_computer_name'] ?: $laptop['brand'] . ' ' . $laptop['model'])) ?>
+                            <?= e($laptop['asset_tag'] . ' · ' . $laptop['brand'] . ' ' . $laptop['model']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -273,14 +273,54 @@ layout_start('My Laptop');
         <section class="virtual-device-panel">
             <div class="virtual-device-heading">
                 <div>
-                    <div class="eyebrow">DEVICE AVAILABILITY · AUTOMATED CHECK</div>
-                    <h2><?= e($selectedLaptop['ad_computer_name'] ?: $selectedLaptop['asset_tag']) ?></h2>
+                    <div class="eyebrow">VIRTUAL DEVICE · NOT REMOTE POWER CONTROL</div>
+                    <h2><?= e($selectedLaptop['asset_tag']) ?></h2>
                     <p><?= e($selectedLaptop['asset_tag']) ?> · <?= e($selectedLaptop['brand'] . ' ' . $selectedLaptop['model']) ?></p>
                 </div>
-                <span class="device-status-pill"><?= e(ucfirst($selectedLaptop['endpoint_status'] ?? 'unknown')) ?></span>
+                <span class="device-status-pill"><?= e($selectedLaptop['status']) ?></span>
             </div>
-            <p>Endpoint availability comes from the last authorized network or remote management check. AD account status is tracked separately.</p>
-            <?php if (!empty($selectedLaptop['endpoint_check_reason'])): ?><p class="muted"><?= e($selectedLaptop['endpoint_check_reason']) ?></p><?php endif; ?>
+            <div class="virtual-laptop" data-state="<?= e($selectedLaptop['virtual_power_state']) ?>">
+                <div class="virtual-screen-frame">
+                    <div class="virtual-screen">
+                        <div class="virtual-desktop" id="virtual-desktop" <?= $selectedLaptop['virtual_power_state'] === 'off' ? 'hidden' : '' ?>>
+                            <span class="desktop-brand">SLK <small>ASSET MANAGEMENT</small></span>
+                            <div>
+                                <span class="desktop-status-dot"></span>
+                                <p class="desktop-device"><?= e($selectedLaptop['asset_tag']) ?></p>
+                                <p class="desktop-note">This is a visual representation of the asset, not a connection to the physical laptop.</p>
+                            </div>
+                            <a class="desktop-details-link" href="#device-details">View device details ↓</a>
+                        </div>
+                        <div class="virtual-screen-off" id="virtual-screen-off" <?= $selectedLaptop['virtual_power_state'] === 'on' ? 'hidden' : '' ?>>
+                            <span class="screen-off-indicator"></span>
+                            <strong>Powered off</strong>
+                            <small>Virtual display only</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="virtual-hinge"></div>
+                <div class="virtual-base">
+                    <div class="virtual-keyboard" aria-hidden="true">
+                        <?php for ($row = 0; $row < 3; $row++): ?>
+                            <div class="keyboard-row"><?php for ($key = 0; $key < 13; $key++): ?><i></i><?php endfor; ?></div>
+                        <?php endfor; ?>
+                    </div>
+                    <div class="virtual-trackpad" aria-hidden="true"></div>
+                    <button
+                        type="button"
+                        class="virtual-power-button"
+                        id="virtual-power-button"
+                        aria-pressed="<?= $selectedLaptop['virtual_power_state'] === 'on' ? 'true' : 'false' ?>"
+                        data-laptop-id="<?= (int) $selectedLaptop['id'] ?>"
+                        data-csrf="<?= e(csrf()) ?>"
+                    >
+                        <span class="power-symbol">⏻</span>
+                        <span id="power-label"><?= $selectedLaptop['virtual_power_state'] === 'on' ? 'Turn virtual display off' : 'Turn virtual display on' ?></span>
+                    </button>
+                </div>
+            </div>
+            <p class="virtual-disclaimer">Changing this virtual state never turns the physical device on or off.</p>
+            <p class="power-error" id="power-error" role="alert" hidden></p>
             <div class="virtual-actions">
                 <a class="button" href="report_laptop_issue.php?laptop_id=<?= (int) $selectedLaptop['id'] ?>">Report an issue</a>
                 <a class="button secondary" href="#device-details">Device details</a>
@@ -294,34 +334,19 @@ layout_start('My Laptop');
                     <?php foreach ([
                         'Asset tag' => $selectedLaptop['asset_tag'],
                         'Inventory serial' => $selectedLaptop['serial_number'],
-                        'Manufacturer serial' => $selectedLaptop['manufacturer_serial'] ?: 'Not available',
-                        'Computer name' => $selectedLaptop['ad_computer_name'] ?: 'Not available',
                         'Manufacturer' => $selectedLaptop['brand'],
                         'Model' => $selectedLaptop['model'],
-                        'Operating system' => $selectedLaptop['ad_operating_system'] ?: 'Not available',
-                        'OS version' => $selectedLaptop['ad_operating_system_version'] ?: 'Not available',
-                        'Processor' => $selectedLaptop['processor_description'] ?: 'Not available',
-                        'Memory' => $selectedLaptop['ram_gb'] ? $selectedLaptop['ram_gb'] . ' GB' : 'Not available',
-                        'Storage' => $selectedLaptop['storage_gb'] ? $selectedLaptop['storage_gb'] . ' GB' : 'Not available',
                         'Department' => $selectedLaptop['department'] ?: 'Not available',
                         'Assigned employee' => $selectedLaptop['assigned_name'] ?: 'Unassigned',
                         'Purchase date' => $selectedLaptop['purchase_date'] ?: 'Not available',
                         'Warranty expiry' => $selectedLaptop['warranty_expiry'] ?: 'Not available',
                         'Asset status' => $selectedLaptop['status'],
-                        'AD account' => isset($selectedLaptop['ad_enabled']) ? ((int) $selectedLaptop['ad_enabled'] ? 'Enabled' : 'Disabled') : 'Not available',
-                        'DNS hostname' => $selectedLaptop['ad_dns_hostname'] ?: 'Not available',
-                        'Organizational unit' => $selectedLaptop['ad_organizational_unit'] ?: 'Not available',
-                        'Last AD logon' => $selectedLaptop['ad_last_logon_at'] ?: 'Not available',
-                        'Last connectivity check' => $selectedLaptop['endpoint_checked_at'] ?: 'Not available',
-                        'Last successful connectivity' => $selectedLaptop['last_successful_connectivity_at'] ?: 'Not available',
-                        'Last hardware scan' => $selectedLaptop['hardware_last_scanned_at'] ?: 'Not available',
-                        'AD inventory sync' => $selectedLaptop['ad_last_synced_at'] ?: 'Not available',
-                        'AD inventory record' => !empty($selectedLaptop['ad_missing_since']) ? 'Missing from scope since ' . $selectedLaptop['ad_missing_since'] : 'Present in scope',
+                        'Virtual power' => strtoupper($selectedLaptop['virtual_power_state']),
                     ] as $label => $value): ?>
                         <div><dt><?= e($label) ?></dt><dd><?= e((string) $value) ?></dd></div>
                     <?php endforeach; ?>
                 </dl>
-                <p class="monitoring-note">Availability reflects the most recent configured connectivity check. A disabled AD account does not mean the physical device is offline.</p>
+                <p class="monitoring-note">The virtual display is a project simulation only; its state does not report or control the physical laptop.</p>
             </article>
 
             <div>
@@ -371,4 +396,47 @@ layout_start('My Laptop');
 </section>
 
 
+<?php if ($selectedLaptop !== null): ?>
+<script>
+(() => {
+    const button = document.getElementById('virtual-power-button');
+    const laptop = document.querySelector('.virtual-laptop');
+    const desktop = document.getElementById('virtual-desktop');
+    const screenOff = document.getElementById('virtual-screen-off');
+    const label = document.getElementById('power-label');
+    const error = document.getElementById('power-error');
+
+    button.addEventListener('click', async () => {
+        const nextState = button.getAttribute('aria-pressed') === 'true' ? 'off' : 'on';
+        const body = new URLSearchParams({
+            laptop_id: button.dataset.laptopId,
+            state: nextState,
+            csrf: button.dataset.csrf
+        });
+        button.disabled = true;
+        error.hidden = true;
+        try {
+            const response = await fetch('api/laptop_power_state.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Could not save virtual power state.');
+            const isOn = result.state === 'on';
+            laptop.dataset.state = result.state;
+            desktop.hidden = !isOn;
+            screenOff.hidden = isOn;
+            button.setAttribute('aria-pressed', String(isOn));
+            label.textContent = isOn ? 'Turn virtual display off' : 'Turn virtual display on';
+        } catch (requestError) {
+            error.textContent = requestError.message;
+            error.hidden = false;
+        } finally {
+            button.disabled = false;
+        }
+    });
+})();
+</script>
+<?php endif; ?>
 <?php layout_end(); ?>

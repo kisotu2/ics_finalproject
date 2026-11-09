@@ -2313,6 +2313,10 @@ button[disabled],
     transition: opacity 180ms ease;
 }
 
+.virtual-desktop[hidden] {
+    display: none;
+}
+
 .desktop-brand {
     font-size: 12px;
     font-weight: 800;

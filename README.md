@@ -19,7 +19,8 @@ A web-based ICT asset management application designed to help organisations main
 - [Requirements](#requirements)
 - [Installation and Setup](#installation-and-setup)
 - [Database Migrations](#database-migrations)
-- [Active Directory Laptop Inventory](#active-directory-laptop-inventory)
+- [Laptop Portal and Issue Review](#laptop-portal-and-issue-review)
+- [Software Licence Expiry Reminders](#software-licence-expiry-reminders)
 - [Running the Flask API](#running-the-flask-api)
 - [Training the Model](#training-the-model)
 - [Security Considerations](#security-considerations)
@@ -307,171 +308,34 @@ Migration filenames are provided as references; their existence and compatibilit
 
 ### XAMPP migration and initial setup
 
-For a fresh installation, import `database.sql` (it creates `ira_assets_recovered`, matching `config.example.php`), create local configuration from `config.example.php`, install Composer packages with `composer install`, and complete the administrator setup. The fresh schema includes the Active Directory inventory fields.
+For a fresh installation, import `database.sql` (it creates `ira_assets_recovered`, matching `config.example.php`), create local configuration from `config.example.php`, install Composer packages with `composer install`, and complete the administrator setup. Administrators can register laptops manually and employees can use the virtual laptop portal.
 
 For an existing installation:
 
 1. Back up the configured database.
 2. Confirm the database contains the `laptops` table and has already received the other migrations required by this version.
-3. Apply `migrations/20261026_active_directory_inventory.sql` to `ira_assets_recovered` (the current local configuration). If your deployment uses another database name, change the migration's initial `USE` statement to that already-configured database after confirming the backup.
-4. Verify `laptops.ad_object_guid`, `laptops.manufacturer_serial`, `laptops.processor_description` and `ad_sync_events` exist before running the connector.
-5. Test migration and sync behavior in a staging copy before applying to production.
+3. Apply `migrations/20261027_virtual_laptop_portal.sql` after checking which columns and tables already exist. Change its initial `USE` statement to the configured database if needed.
+4. Test migration and portal behavior in a staging copy before applying to production.
 
-The migration copies a legacy serial into `manufacturer_serial` only when that field is empty, then assigns database-ID-based internal serials to rows still using legacy serials. Existing manufacturer serial values and already-generated `IRA-LAP-` inventory serials (including collision suffixes) are preserved. Manufacturer serials are deliberately not unique because endpoint data can be missing or duplicated.
+The portal migration adds virtual power state, responsible administrators, issue reporting, notifications and linked maintenance records. Back up first and do not drop issue tables while they contain reports.
 
-For an existing installation, apply `migrations/20261027_virtual_laptop_portal.sql` and `migrations/20261106_ad_endpoint_monitoring.sql` after backing up. Change each migration’s initial `USE` statement to the configured database if needed. The monitoring migration adds AD account metadata, endpoint status and run/request tracking. It keeps the legacy virtual display column for compatibility, but the application no longer reads or changes it. It does not delete or rewrite existing laptop or maintenance records. Restore the backup to roll back; do not drop new tables while they contain reports.
+## Laptop Portal and Issue Review
 
-### Laptop portal and issue review
+Administrators manually register laptops from the dashboard, then assign them to employees. Employees can open **My Laptop** for devices assigned to their account, view inventory information, and report issues. The laptop illustration and on/off state are a simulation only; they do not connect to or control physical devices. Reports are assigned to the laptop's responsible administrator, or notified to active super administrators when none is set. Administrators review reports from **Issue review**. Approving a report creates one linked maintenance record; rejection, information requests, employee responses, duplicates, and status changes are retained in issue updates and audit history.
 
-Employees can open **My Laptop** for devices assigned to their own account, review inventory and automated endpoint status, and report an issue. The page shows AD account status separately from the last endpoint connectivity result; it has no manual power control. The legacy API returns HTTP 410 for old virtual power requests. Reports are assigned to the laptop's responsible administrator, or notified to active super administrators when none is set. Administrators review reports from **Issue review**. Approving a report creates one linked maintenance record; rejection, information requests, employee responses, duplicates, and status changes are retained in issue updates and audit history.
+New laptop asset tags are assigned from the database using the first available `IRA-LAP-###` value. The tag is generated when the record is saved and protected by the unique asset-tag index.
 
-AD sync is performed by the Windows connector described below. Offline or unreachable endpoints remain in the inventory, keep their last known hardware data, and are never retired or deleted automatically. A complete successful run can mark a previously discovered AD object missing from its configured scope for review; it does not remove the asset, assignment, maintenance history, or serial number.
+## Software Licence Expiry Reminders
 
-## Active Directory Laptop Inventory
+The daily reminder job emails every active administrator (`admin` and `super_admin`) and, when configured, the `admin_alert_email` address. It starts seven days before an active licence expires and repeats once per day, including after expiry, until the licence expiry date is updated or the record is set to Suspended or Retired. SMTP settings must be completed in the private `config.php`.
 
-The PHP application does not read Microsoft Active Directory directly. It accepts records from `scripts/Sync-ActiveDirectoryInventory.ps1`, an authorized connector intended to run on a domain-joined Windows host.
+For an existing database, back it up and apply `migrations/20261109_software_expiry_notifications.sql`, changing its `USE` statement if the configured database has a different name. Add a daily cron entry (adjust the paths for the installation) to run the job, for example at 08:00:
 
-### What is collected
-
-The connector reads the AD computer object GUID, computer name, distinguished name, DNS hostname, OU, enabled state, operating-system metadata, last logon timestamp, creation date and modification date with the Active Directory PowerShell module. For every AD computer, it uses ICMP and PowerShell remoting/CIM to classify endpoint availability and, when reachable, query manufacturer, model, BIOS serial, processor, RAM and physical storage. It always sends the AD identity, even when endpoint collection fails; null hardware is preserved as unknown in the database. Active Directory commonly does **not** contain these current hardware properties.
-
-Endpoint queries require administrator-approved remote management, appropriate least-privilege account permissions, WinRM/CIM configuration, and firewall rules on the endpoints. Endpoint availability is stored as `online`, `offline`, `unreachable` or `unknown`. ICMP response is enough to report online even when WinRM fails; failure reasons are retained for review. A failed endpoint does not stop other computers in the run. `lastLogonTimestamp` is replicated AD metadata and may lag, so it is not used as a real-time power or availability signal.
-
-The connector does not infer a purchase date from AD object timestamps. Purchase dates remain unknown unless a trusted date is supplied in a validated payload or through the controlled training-data import. Warranty expiry may be in the future; a purchase/acquisition date may not.
-
-### Send one laptop from that laptop
-
-For an enrolled, domain-joined Windows laptop, an administrator can provide `scripts/Send-ThisLaptopInventory.ps1` and the HTTPS endpoint URL. The script looks up that laptop's own AD computer object, reads hardware locally, and sends one record to the same ingestion endpoint. It requires the Active Directory PowerShell module, network access to the domain, and an `AD_SYNC_TOKEN` supplied to the process through an approved secret-management or device-management method.
-
-Run it from PowerShell on the laptop:
-
-```powershell
-.\Send-ThisLaptopInventory.ps1 `
-  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php'
+```cron
+0 8 * * * /Applications/XAMPP/xamppfiles/bin/php /Applications/XAMPP/xamppfiles/htdocs/ics_finalproject/scripts/send_software_expiry_reminders.php >> /Applications/XAMPP/xamppfiles/htdocs/ics_finalproject/software-expiry-reminders.log 2>&1
 ```
 
-The script requires HTTPS and sends immediately; it does not save the token or hardware payload to disk. Do not add a token to the script, share a token through email/chat, or expose the shared ingestion token to untrusted users. Restrict who can run the script and provision its token through managed deployment. A computer that is not joined to the directory, or whose AD object cannot be read, cannot be submitted through this AD-GUID-keyed endpoint.
-
-For a Mac with an existing AD computer object, use [`scripts/Send-ThisMacInventory.ps1`](scripts/Send-ThisMacInventory.ps1). It is designed for PowerShell 7 on macOS and collects Apple hardware data using local macOS utilities. The sender requires IT to supply the matching AD GUID, computer name, distinguished name, and enabled state, plus the HTTPS endpoint. It does not query Active Directory itself; PowerShell's Windows ActiveDirectory module is not supported on macOS.
-
-After downloading the script (for example to `~/Downloads`), run it on the Mac using the installed PowerShell executable (or `pwsh` if it is on `PATH`):
-
-```bash
-/usr/local/microsoft/powershell/7-preview/pwsh \
-  -File "$HOME/Downloads/Send-ThisMacInventory.ps1" \
-  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php' \
-  -AdGuid 'a6f33f8b-f62d-4acb-96be-8e1ef6ab0c21' \
-  -DirectoryComputerName 'MAC-ACCOUNTING-01' \
-  -DistinguishedName 'CN=MAC-ACCOUNTING-01,OU=Macs,DC=example,DC=com' \
-  -Enabled $true
-```
-
-Provide `-Enabled $true` or `-Enabled $false` to match the AD object. This required value prevents a missing switch from silently marking an enabled Mac as disabled. The default is preview-only and does not require the token. Review the displayed hardware and AD identity. To submit, rerun the same command with `-Send`. Replace the example identity only with values confirmed by IT for this Mac. The script reads `AD_SYNC_TOKEN` from its process environment only when `-Send` is specified; IT must provision it securely and must not place it in the command, script, or a shared download. The application currently accepts the server-configured sync token, not per-device credentials, so access to that token must remain restricted to authorized administrators and devices. Configure VPN/network allowlisting and HTTPS as required by the server policy.
-
-### Secure endpoint configuration
-
-The ingestion endpoint is:
-
-```text
-POST /ics_finalproject/ad_sync_api.php
-```
-
-It requires HTTPS, an `Authorization: Bearer <token>` header, `Content-Type: application/json`, payloads no larger than 2 MiB, and 1–500 computer records. The token is read only from the PHP server environment variable `AD_SYNC_TOKEN`; the PHP endpoint rejects an unset or shorter-than-32-character token. Generate a high-entropy value locally, for example:
-
-```bash
-openssl rand -base64 48
-```
-
-Configure the same generated value as an environment variable for Apache/PHP and for the authorized connector process, using the operating system's protected secret-management mechanism. Do not paste it into project files, shell history, a URL, logs, or the connector script. For XAMPP, Apache may need to be restarted after changing its environment. Keep local configuration files private and outside source control.
-
-At the network layer, restrict the endpoint to the connector's fixed source address and configure TLS. For a direct connector, Apache and the host firewall allowlist the connector; behind a proxy, Apache allowlists the proxy and the proxy/firewall must separately allowlist the connector. An Apache 2.4 example is provided in `docs/apache-ad-sync-location.conf.example`; replace its documentation-only IP address with the actual trusted connector address and install it in the applicable VirtualHost. Also restrict the path using the host firewall. Do not expose this endpoint to the public Internet. On this XAMPP installation, the `httpd-vhosts.conf` include is commented out in `xamppfiles/etc/httpd.conf`, while the default TLS VirtualHost is in `xamppfiles/etc/extra/httpd-ssl.conf`. Either enable and configure an HTTPS vhost in `httpd-vhosts.conf`, or place the provided `<LocationMatch>` block inside the active `<VirtualHost _default_:443>` in `httpd-ssl.conf`; replace the sample address, ensure the SSL include is enabled when Apache starts, then restart Apache. Keep environment directives in an untracked, administrator-only Apache configuration file (or use a protected service environment): `SetEnv AD_SYNC_TOKEN "<secret>"`. If running local-only development, add `SetEnv AD_SYNC_ALLOW_INSECURE_LOCAL "1"` only to the local configuration and remove it before deployment. For a trusted TLS proxy, add `SetEnv AD_SYNC_TRUSTED_PROXY_IPS "<proxy-ip>"` and ensure it overwrites the forwarded scheme header rather than passing client input through.
-
-For local-only XAMPP development, HTTP is accepted solely from `127.0.0.1` or `::1` when `AD_SYNC_ALLOW_INSECURE_LOCAL=1` is set. This development exception is not appropriate for a domain connector or production deployment.
-
-If TLS terminates at a reverse proxy, set `AD_SYNC_TRUSTED_PROXY_IPS` to the immediate proxy's fixed IP address or addresses and have it send `X-Forwarded-Proto: https`. The PHP endpoint trusts that header only when `REMOTE_ADDR` exactly matches this explicit list; do not trust forwarded headers from arbitrary clients. The API also limits authenticated calls to 30 requests per immediate peer per minute and accepts at most 500 computers/2 MiB per request. The example Apache location rule allowlists a fixed connector address; apply the same restriction in the host firewall. Rotate any token that was exposed during troubleshooting before production, and restart Apache after changing the environment.
-
-### Preview and send
-
-On the domain-joined Windows host, open PowerShell with the Active Directory module installed. Use an OU distinguished name scoped to the computers approved for inventory:
-
-```powershell
-.\scripts\Sync-ActiveDirectoryInventory.ps1 `
-  -SearchBase 'OU=Workstations,DC=example,DC=com' `
-  -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php'
-```
-
-The default is preview-only; it queries the AD scope and endpoints but sends nothing. The sender includes a stable run identifier and scope across API batches; only a complete run with no record failures can mark unseen AD objects missing. After reviewing the preview and confirming the network/TLS configuration, securely prompt for the token and run the send in that same PowerShell session (or provision it with approved device-management secret storage):
-
-```powershell
-$secureToken = Read-Host 'AD sync token' -AsSecureString
-$tokenPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
-try {
-    $env:AD_SYNC_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPointer)
-    .\scripts\Sync-ActiveDirectoryInventory.ps1 `
-      -SearchBase 'OU=Workstations,DC=example,DC=com' `
-      -ApiUrl 'https://inventory.example.com/ics_finalproject/ad_sync_api.php' `
-      -Send
-} finally {
-    Remove-Item Env:AD_SYNC_TOKEN -ErrorAction SilentlyContinue
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPointer)
-}
-```
-
-
-### Unattended scheduling and dashboard requests
-
-On the authorized Windows host, provision the API token in the machine or service account environment through your protected configuration management. Grant the connector identity read access to the approved AD search base and only the remote endpoint permissions needed for CIM/WinRM inventory. Do not use Domain Admin for routine collection. Configure HTTPS trust and firewall allowlisting before starting the service.
-
-Register the startup runner from an elevated PowerShell session:
-
-```powershell
-.\scripts\Register-ActiveDirectoryInventoryTask.ps1 `
-  -SearchBase 'OU=Workstations,DC=example,DC=com' `
-  -ApiUrl 'https://inventory.example.com/ics_finalproject'
-```
-
-The task runs the connector loop at startup, schedules a full sync every 15 minutes, and polls the authenticated request queue every 30 seconds. The default scheduled principal is `SYSTEM`; in a domain deployment, grant the computer account the required AD read permissions and endpoint CIM access. For a dedicated gMSA, pass `-ServiceAccount 'DOMAIN\AssetSync$'`; grant it only AD read and endpoint CIM/WinRM permissions. For a regular domain service account, create the task through Windows Task Scheduler using the organization's managed credential process, and set `AD_SYNC_TOKEN` in that account's protected process environment. The web dashboard's **Synchronise Now** button creates a real queued request; the agent claims it and reports the result to the dashboard. It cannot run while the Windows agent is stopped.
-
-The migration creates `ad_sync_runs`, `ad_sync_run_devices`, `ad_sync_requests` and `ad_sync_agent_state`. Run tracking only flags unseen computers after the final batch of a complete, failure-free run. Interrupted/partial runs never mark records missing.
-
-The connector sends batches of up to 100 records. A JSON record has this shape:
-
-```json
-{
-  "version": 1,
-  "computers": [{
-    "ad_guid": "a6f33f8b-f62d-4acb-96be-8e1ef6ab0c21",
-    "computer_name": "WS-ACCOUNTING-01",
-    "distinguished_name": "CN=WS-ACCOUNTING-01,OU=Workstations,DC=example,DC=com",
-    "enabled": true,
-    "operating_system": "Windows 11 Enterprise",
-    "operating_system_version": "10.0.26100",
-    "manufacturer": "Example manufacturer",
-    "model": "Example model",
-    "manufacturer_serial": null,
-    "processor": "Example processor",
-    "ram_gb": 16,
-    "storage_gb": 512,
-    "purchase_date": null,
-    "warranty_expiry": null
-  }]
-}
-```
-
-The example is illustrative; its values are not a claim about an actual device. Repeated sends update the same laptop by AD object GUID. Each laptop's `serial_number` is generated from its database ID (`IRA-LAP-000123`, with a deterministic collision suffix if needed); the BIOS serial remains separate in nullable, non-unique `manufacturer_serial`. Empty hardware values are preserved as unknown, not invented. The response reports created, updated and failed records plus missing/duplicate manufacturer serials. Sync events are stored in `ad_sync_events`; record-level failures are also written to the PHP server log without recording the bearer token.
-
-Administrators can view readiness, endpoint/account metrics, filtered inventory, recent runs and the connector poll time at `directory_sync.php`. The page does not expose the secret. Manual laptop registration and legacy laptop AJAX creation are disabled; viewing, assignment, maintenance and reporting remain available.
-
-### AD sync tests
-
-Run the dependency-free validation tests with:
-
-```bash
-php tests/ad_sync_validation_test.php
-bash tests/ad_sync_http_test.sh
-```
-
-The HTTP boundary test starts a temporary localhost PHP server and checks method restrictions, invalid/missing tokens, malformed JSON, content type, invalid records, request limits/rate behavior, and transport validation. Record-level validation failures return HTTP 207 while valid records in the same batch continue. Database idempotency/serial-collision, production HTTPS, unauthorized-page, and Windows endpoint scenarios are listed in [`tests/AD_SYNC_TEST_PLAN.md`](tests/AD_SYNC_TEST_PLAN.md); they require an isolated test database and/or a configured Windows domain. Do not run them against production.
+The job records each successful email by licence, recipient, expiry date, and day, so repeated runs do not send duplicates on the same day. Review the cron log and PHP error log for delivery failures. Administrators can renew a licence or deactivate it from its **Software details** page.
 
 ## Running the Flask API
 
@@ -611,7 +475,7 @@ Ignoring a file through `.gitignore` does not remove it if it was committed prev
 
 ## Release Archive Contents
 
-The distributable ZIP includes the application source, Composer dependencies, database schema and migrations, connector, tests, documentation and existing machine-learning assets. It excludes local configuration and OAuth credential/token files, local database files, Python caches/virtual environments, temporary office files, and optional demo seed files that contain demo credentials or non-AD laptop fixtures. Create `config.php` from `config.example.php` and configure secrets through protected environment variables after extraction.
+The distributable ZIP includes the application source, Composer dependencies, database schema and migrations, tests, documentation and existing machine-learning assets. It excludes local configuration and OAuth credential/token files, local database files, Python caches/virtual environments, temporary office files, and optional demo seed files that contain demo credentials. Create `config.php` from `config.example.php` and configure secrets through protected environment variables after extraction.
 
 ## Testing and Evaluation
 
@@ -622,14 +486,19 @@ Testing should distinguish functional correctness from predictive-model performa
 Test the implemented workflows, including:
 
 - Authentication and access control.
-- Asset registration and inventory updates.
+- Manual laptop registration, duplicate validation and inventory updates.
+- Automatic laptop asset-tag generation.
+- Software expiry reminders, renewal/deactivation, and repeat-run duplicate prevention.
 - Asset assignment and lifecycle status changes.
+- Virtual display state and assigned-device privacy in the **My Laptop** portal.
+- Issue reporting, administrator review, notifications and linked maintenance.
 - Maintenance-record creation and status updates.
 - Reporting and audit-related operations.
 - PHP communication with the Flask API.
 - API handling of valid requests, missing fields and invalid input.
 
 Record the test identifier, preconditions, input, expected result, actual result and pass/fail status.
+Manual portal integration cases are listed in [`tests/LAPTOP_PORTAL_TEST_PLAN.md`](tests/LAPTOP_PORTAL_TEST_PLAN.md).
 
 ### Model Evaluation
 

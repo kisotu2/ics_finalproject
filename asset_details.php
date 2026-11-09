@@ -87,8 +87,7 @@ h3{color:#b08116;}
 <p><b>Brand:</b> <?= htmlspecialchars($asset['brand']) ?></p>
 <p><b>Model:</b> <?= htmlspecialchars($asset['model']) ?></p>
 <?php if ($category === 'laptop'): ?>
-<p><b>Inventory serial:</b> <?= htmlspecialchars($asset['serial_number'] ?? 'Not recorded') ?></p>
-<p><b>Manufacturer serial:</b> <?= htmlspecialchars($asset['manufacturer_serial'] ?? 'Not reported') ?></p>
+<p><b>Serial number:</b> <?= htmlspecialchars($asset['serial_number'] ?? 'Not recorded') ?></p>
 <?php endif; ?>
 <p><b>Status:</b> 
 <span class="badge <?= !empty($asset['assigned_to']) ? 'issued':'available' ?>">

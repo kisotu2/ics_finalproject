@@ -300,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $where = $filter === '' ? '' : 'WHERE i.status = ?';
-$query = "SELECT i.*, l.asset_tag, l.ad_computer_name, l.brand, l.model,
+$query = "SELECT i.*, l.asset_tag, l.brand, l.model,
                  reporter.full_name AS reporter_name, admin.full_name AS admin_name,
                  duplicate.reference_code AS duplicate_reference,
                  m.id AS maintenance_id, m.status AS maintenance_status
@@ -349,7 +349,7 @@ layout_start('Laptop issues');
                 <div>
                     <span class="issue-reference"><?= e($issue['reference_code']) ?></span>
                     <h2><?= e($issue['title']) ?></h2>
-                    <p><?= e($issue['asset_tag']) ?> · <?= e($issue['ad_computer_name'] ?: $issue['brand'] . ' ' . $issue['model']) ?> · Reported by <?= e($issue['reporter_name'] ?: 'Unknown') ?></p>
+                    <p><?= e($issue['asset_tag']) ?> · <?= e($issue['brand'] . ' ' . $issue['model']) ?> · Reported by <?= e($issue['reporter_name'] ?: 'Unknown') ?></p>
                 </div>
                 <div class="issue-review-badges">
                     <span class="severity-badge severity-<?= e($issue['severity']) ?>"><?= e(ucfirst($issue['severity'])) ?></span>

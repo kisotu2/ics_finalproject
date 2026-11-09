@@ -21,7 +21,7 @@ function laptop_portal_schema_ready(mysqli $conn): bool
         return false;
     }
 
-    $columns = ['responsible_admin_id', 'endpoint_status', 'ad_dns_hostname', 'ad_organizational_unit', 'ad_last_logon_at', 'ad_account_created_at', 'ad_account_modified_at', 'endpoint_checked_at', 'last_successful_connectivity_at', 'hardware_last_scanned_at', 'endpoint_check_reason', 'ad_sync_error', 'ad_scope_id', 'ad_last_seen_at', 'ad_missing_since', 'ad_enabled', 'ad_last_synced_at'];
+    $columns = ['responsible_admin_id', 'virtual_power_state'];
     $quotedColumns = "'" . implode("','", $columns) . "'";
     $columnStmt = $conn->prepare(
         "SELECT COUNT(DISTINCT column_name) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'laptops' AND column_name IN ($quotedColumns)"

@@ -4,13 +4,8 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 
-require 'db.php';
-session_start();
-
-if(!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin'){
-    header("Location: login.php");
-    exit();
-}
+require __DIR__ . '/bootstrap.php';
+require_login(['super_admin']);
 
 $message = "";
 
@@ -132,7 +127,7 @@ if(isset($_POST['add_asset'])){
     $assigned_to = NULL;
 
     if ($category === 'Laptop') {
-        $message = 'Laptop inventory must be registered through Active Directory sync.';
+        $message = 'Register laptops through the asset manager.';
     } elseif (!in_array($category, ['Phone', 'Desktop'], true)) {
         $message = 'Invalid asset category.';
     } else {
@@ -377,23 +372,23 @@ function filterAssets(type){
     <div style="margin-bottom:20px; padding:10px; border:1px solid #ddd; border-radius:6px;">
         <h3>Add New Asset</h3>
         <form id="addAssetForm">
-            <input type="text" name="asset_tag" placeholder="Asset Tag" required>
+            <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+            <input type="text" name="asset_tag" id="assetTag" placeholder="Asset Tag" required>
             <input type="text" name="serial_number" placeholder="Serial Number" required>
             <input type="text" name="brand" placeholder="Brand" required>
             <input type="text" name="model" placeholder="Model" required>
-            <select name="status" required>
-                <option value="Active">Active</option>
-                <option value="Faulty">Faulty</option>
+            <select name="status" id="assetStatus" required>
+                <option value="Available">Available</option>
+                <option value="Maintenance">Maintenance</option>
                 <option value="Retired">Retired</option>
             </select>
             <select name="category" required>
-                <option value="Laptop" disabled>Laptop — use directory sync</option>
+                <option value="Laptop">Laptop</option>
                 <option value="Phone">Phone</option>
                 <option value="Desktop">Desktop</option>
             </select>
             <button type="submit">Add Asset</button>
         </form>
-        <p><a href="directory_sync.php">Register or refresh laptops through Active Directory</a></p>
         <p id="assetMessage" style="font-weight:bold;margin-top:5px;"></p>
     </div>
 
@@ -436,6 +431,23 @@ function filterAssets(type){
     });
 }
 
+function updateAssetStatuses(){
+    const category = document.querySelector('#addAssetForm [name="category"]').value;
+    const status = document.getElementById('assetStatus');
+    const assetTag = document.getElementById('assetTag');
+    const options = category === 'Laptop'
+        ? ['Available', 'Maintenance', 'Retired', 'Disposed']
+        : ['Active', 'Faulty', 'Retired'];
+    status.replaceChildren(...options.map(value => new Option(value, value)));
+    assetTag.required = category !== 'Laptop';
+    assetTag.readOnly = category === 'Laptop';
+    assetTag.placeholder = category === 'Laptop' ? 'Generated automatically on save' : 'Asset Tag';
+    assetTag.value = '';
+}
+
+document.querySelector('#addAssetForm [name="category"]').addEventListener('change', updateAssetStatuses);
+updateAssetStatuses();
+
 // AJAX ADD ASSET
 document.getElementById('addAssetForm').addEventListener('submit', function(e){
     e.preventDefault();
@@ -448,27 +460,7 @@ document.getElementById('addAssetForm').addEventListener('submit', function(e){
             msg.textContent = data.message;
             msg.style.color = data.success ? 'green' : 'red';
             if(data.success){
-                // Append new row to table
-            // Append new row to table dynamically
-const table = document.getElementById('assetTable');
-const tr = document.createElement('tr');
-tr.setAttribute('data-type', formData.get('category').toLowerCase());
-tr.innerHTML = `
-    <td>${formData.get('category')}</td>
-    <td>
-        <a href="asset_details.php?id=${data.id}&category=${formData.get('category').toLowerCase()}" 
-           style="color:#b08116; font-weight:bold; text-decoration:none;">
-            ${formData.get('asset_tag')}
-        </a>
-    </td>
-    <td>${formData.get('serial_number')}</td>
-    <td>${formData.get('brand')}</td>
-    <td>${formData.get('model')}</td>
-    <td>${formData.get('status')}</td>
-    <td><span style="color:green;font-weight:bold;">Available</span></td>
-`;
-table.appendChild(tr);
-                this.reset();
+                window.location.reload();
             }
         })
         .catch(error => {

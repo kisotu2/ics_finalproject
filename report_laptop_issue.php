@@ -26,13 +26,13 @@ $laptop = null;
 if ($laptopId) {
     if ($isAdmin) {
         $stmt = $conn->prepare(
-            'SELECT id, asset_tag, ad_computer_name, brand, model, assigned_to, responsible_admin_id
+            'SELECT id, asset_tag, brand, model, assigned_to, responsible_admin_id
              FROM laptops WHERE id = ?'
         );
         $stmt->bind_param('i', $laptopId);
     } else {
         $stmt = $conn->prepare(
-            'SELECT id, asset_tag, ad_computer_name, brand, model, assigned_to, responsible_admin_id
+            'SELECT id, asset_tag, brand, model, assigned_to, responsible_admin_id
              FROM laptops WHERE id = ? AND assigned_to = ?'
         );
         $stmt->bind_param('ii', $laptopId, $user['id']);
@@ -206,7 +206,7 @@ layout_start('Report an issue');
         <section class="panel"><h2>Device unavailable</h2><p>You can only report an issue for a laptop assigned to your account.</p></section>
     <?php else: ?>
         <section class="panel issue-report-panel">
-            <div class="panel-header"><div><h2><?= e($laptop['asset_tag']) ?> · <?= e($laptop['ad_computer_name'] ?: $laptop['brand'] . ' ' . $laptop['model']) ?></h2><span>Provide enough detail for the administrator to review the problem.</span></div></div>
+            <div class="panel-header"><div><h2><?= e($laptop['asset_tag']) ?> · <?= e($laptop['brand'] . ' ' . $laptop['model']) ?></h2><span>Provide enough detail for the administrator to review the problem.</span></div></div>
             <?php if ($error !== ''): ?><p class="notice error" role="alert"><?= e($error) ?></p><?php endif; ?>
             <form method="post">
                 <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">

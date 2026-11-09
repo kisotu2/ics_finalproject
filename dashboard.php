@@ -10,8 +10,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         header('Location: laptop_assignment.php'); exit;
     }
     if ($action === 'asset') {
-        flash('Laptop inventory is registered through Active Directory sync.', 'error');
-        header('Location: directory_sync.php');
+        header('Location: add_laptop.php');
         exit;
     }
     if ($action === 'responsible_admin') {
@@ -300,7 +299,7 @@ layout_start('Dashboard'); ?><div class="hero">
         </p>
             </div>
             <?php if($admin):?>
-            <a class="button" href="directory_sync.php">Sync laptop inventory</a>
+            <a class="button" href="add_laptop.php">Register laptop</a>
         <?php else: ?>
             <a class="button" href="my_laptop.php">Open My Laptop</a>
         <?php endif; ?>
@@ -328,8 +327,8 @@ layout_start('Dashboard'); ?><div class="hero">
     <section class="split" style="margin-top:24px">
         <div class="panel">
             <h2>Inventory and assignment</h2>
-            <p class="muted">Refresh device details from directory sync, or find the right laptop for an employee.</p>
-            <a class="button" href="directory_sync.php">Directory sync</a>
+            <p class="muted">Register laptops manually, then assign them to employees or find the right laptop for an employee.</p>
+            <a class="button" href="add_laptop.php">Register laptop</a>
             <a class="button secondary" href="laptop_assignment.php">Laptop assignment</a>
         </div>
         <div class="panel">
@@ -356,7 +355,7 @@ layout_start('Dashboard'); ?><div class="hero">
             <tbody>
             <?php $hasAssets = false; while($a=$assets->fetch_assoc()): $hasAssets = true; ?>
                 <tr>
-                    <td><b><?=e($a['asset_tag'])?></b><br><small>Inventory: <?=e($a['serial_number'])?><br>Manufacturer: <?=e($a['manufacturer_serial']??'Not reported')?></small></td>
+                    <td><b><?=e($a['asset_tag'])?></b><br><small>Serial: <?=e($a['serial_number'])?></small></td>
                     <td><?=e($a['brand'].' '.$a['model'])?><br><small><?=e($a['department']??'')?></small></td>
                     <td><?=e($a['status'])?></td>
                     <td><?=e($a['full_name']??($_SESSION['name']??'Unassigned'))?></td>
@@ -386,6 +385,7 @@ layout_start('Dashboard'); ?><div class="hero">
                                 <form method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="assign"><input type="hidden" name="asset_id" value="<?=$a['id']?>"><select name="user_id" required><option value="">Assign to…</option><?php $users->data_seek(0);while($u=$users->fetch_assoc()):?><option value="<?=$u['id']?>"><?=e($u['full_name'])?></option><?php endwhile;?></select><button>Assign</button></form>
                             <?php endif;?>
                             <a class="button secondary" href="my_laptop.php?id=<?=(int)$a['id']?>">View device</a>
+                            <a class="button secondary" href="edit_laptop.php?id=<?=(int)$a['id']?>">Edit laptop</a>
                             <form method="post" style="margin-top:6px"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="status"><input type="hidden" name="asset_id" value="<?=$a['id']?>"><select name="status"><option>Available</option><option>Maintenance</option><option>Retired</option><option>Disposed</option></select><button class="secondary">Update</button></form>
                         </td>
                     <?php else: ?>

@@ -101,7 +101,7 @@ try {
         $check = $conn->prepare(
             "SELECT id, purchase_date
              FROM laptops
-             WHERE asset_tag = ? AND ad_object_guid IS NOT NULL
+             WHERE asset_tag = ?
              LIMIT 1"
         );
 
@@ -112,7 +112,7 @@ try {
 
         if (!$existing) {
             $skipped++;
-            $errors[] = 'Row for ' . $assetTag . ': sync this computer from Active Directory before importing training data.';
+            $errors[] = 'Row for ' . $assetTag . ': register this laptop before importing training data.';
             continue;
         }
 

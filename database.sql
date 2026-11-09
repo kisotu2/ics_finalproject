@@ -23,29 +23,6 @@ CREATE TABLE IF NOT EXISTS laptops (
     id INT AUTO_INCREMENT PRIMARY KEY,
     asset_tag VARCHAR(80) NOT NULL UNIQUE,
     serial_number VARCHAR(120) NOT NULL UNIQUE,
-    manufacturer_serial VARCHAR(120) NULL,
-    ad_object_guid CHAR(36) NULL,
-    ad_computer_name VARCHAR(63) NULL,
-    ad_distinguished_name VARCHAR(1024) NULL,
-    ad_enabled TINYINT(1) NOT NULL DEFAULT 1,
-    ad_dns_hostname VARCHAR(255) NULL,
-    ad_organizational_unit VARCHAR(1024) NULL,
-    ad_last_logon_at DATETIME(6) NULL,
-    ad_account_created_at DATETIME(6) NULL,
-    ad_account_modified_at DATETIME(6) NULL,
-    endpoint_status ENUM('online','offline','unreachable','unknown') NOT NULL DEFAULT 'unknown',
-    endpoint_checked_at DATETIME(6) NULL,
-    last_successful_connectivity_at DATETIME(6) NULL,
-    hardware_last_scanned_at DATETIME(6) NULL,
-    endpoint_check_reason VARCHAR(500) NULL,
-    ad_sync_error VARCHAR(500) NULL,
-    inventory_source ENUM('manual','active_directory','other') NOT NULL DEFAULT 'manual',
-    ad_scope_id VARCHAR(1024) NULL,
-    ad_last_seen_at DATETIME(6) NULL,
-    ad_missing_since DATETIME(6) NULL,
-    ad_operating_system VARCHAR(255) NULL,
-    ad_operating_system_version VARCHAR(100) NULL,
-    ad_last_synced_at DATETIME(6) NULL,
     brand VARCHAR(100) NOT NULL,
     model VARCHAR(120) NOT NULL,
     department VARCHAR(120) NULL,
@@ -60,71 +37,9 @@ CREATE TABLE IF NOT EXISTS laptops (
     purchase_date DATE NULL,
     warranty_expiry DATE NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_laptops_ad_object_guid (ad_object_guid),
-    INDEX idx_laptops_endpoint_status (inventory_source, endpoint_status),
-    INDEX idx_laptops_ad_scope_last_seen (inventory_source, ad_scope_id, ad_last_seen_at),
     CONSTRAINT fk_laptop_user FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_laptop_responsible_admin FOREIGN KEY (responsible_admin_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS ad_sync_events (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    source_ip VARCHAR(45) NOT NULL,
-    received_count INT UNSIGNED NOT NULL DEFAULT 0,
-    created_count INT UNSIGNED NOT NULL DEFAULT 0,
-    updated_count INT UNSIGNED NOT NULL DEFAULT 0,
-    failed_count INT UNSIGNED NOT NULL DEFAULT 0,
-    summary JSON NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_ad_sync_events_created_at (created_at)
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS ad_sync_runs (
-    run_id CHAR(36) PRIMARY KEY,
-    scope_id VARCHAR(1024) NOT NULL,
-    status ENUM('running','successful','partial','failed') NOT NULL DEFAULT 'running',
-    started_at DATETIME(6) NOT NULL,
-    completed_at DATETIME(6) NULL,
-    received_count INT UNSIGNED NOT NULL DEFAULT 0,
-    created_count INT UNSIGNED NOT NULL DEFAULT 0,
-    updated_count INT UNSIGNED NOT NULL DEFAULT 0,
-    failed_count INT UNSIGNED NOT NULL DEFAULT 0,
-    summary JSON NULL,
-    INDEX idx_ad_sync_runs_started (started_at),
-    INDEX idx_ad_sync_runs_status (status, started_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS ad_sync_run_devices (
-    run_id CHAR(36) NOT NULL,
-    ad_object_guid CHAR(36) NOT NULL,
-    PRIMARY KEY (run_id, ad_object_guid),
-    INDEX idx_ad_sync_run_devices_guid (ad_object_guid),
-    CONSTRAINT fk_ad_sync_run_device_run FOREIGN KEY (run_id) REFERENCES ad_sync_runs(run_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS ad_sync_requests (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    requested_by INT NULL,
-    scope_id VARCHAR(1024) NOT NULL,
-    status ENUM('queued','running','successful','partial','failed') NOT NULL DEFAULT 'queued',
-    requested_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    started_at DATETIME(6) NULL,
-    finished_at DATETIME(6) NULL,
-    run_id CHAR(36) NULL,
-    summary JSON NULL,
-    error_message VARCHAR(500) NULL,
-    INDEX idx_ad_sync_requests_queue (status, requested_at),
-    CONSTRAINT fk_ad_sync_request_user FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS ad_sync_agent_state (
-    id TINYINT UNSIGNED PRIMARY KEY,
-    agent_name VARCHAR(150) NULL,
-    last_poll_at DATETIME(6) NULL,
-    last_sync_at DATETIME(6) NULL,
-    last_error VARCHAR(500) NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-INSERT INTO ad_sync_agent_state (id) VALUES (1) ON DUPLICATE KEY UPDATE id = VALUES(id);
 
 CREATE TABLE IF NOT EXISTS laptop_issues (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -211,6 +126,18 @@ CREATE TABLE IF NOT EXISTS software_assignments (
     CONSTRAINT fk_assignment_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_assignment_issuer FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_assignment_revoker FOREIGN KEY (revoked_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS software_expiry_notifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    software_id INT NOT NULL,
+    expiry_date DATE NOT NULL,
+    recipient_email VARCHAR(190) NOT NULL,
+    notified_on DATE NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_software_expiry_notification (software_id, expiry_date, recipient_email, notified_on),
+    CONSTRAINT fk_software_expiry_notification_software
+        FOREIGN KEY (software_id) REFERENCES softwares(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS maintenance_records (

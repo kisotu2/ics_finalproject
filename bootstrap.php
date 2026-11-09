@@ -581,7 +581,6 @@ function layout_start(string $title): void
 <?= nav_item('Software reports', 'software_reports.php', '▤', $currentPage) ?>
 <?= nav_item('Maintenance', 'maintenance.php', '⌁', $currentPage) ?>
 <?= nav_item('Laptop assignment', 'laptop_assignment.php', '⇄', $currentPage) ?>
-<?= nav_item('Directory sync', 'directory_sync.php', 'AD', $currentPage) ?>
 <?= nav_item('Issue review', 'laptop_issues.php', '!', $currentPage) ?>
 <?= nav_item('Virtual devices', 'my_laptop.php', '▱', $currentPage) ?>
 <?= nav_item('History', 'history.php', '◷', $currentPage) ?>
