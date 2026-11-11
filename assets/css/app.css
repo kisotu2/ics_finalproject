@@ -2338,6 +2338,30 @@ button[disabled],
     letter-spacing: -.04em;
 }
 
+.virtual-session-clock {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 12px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 8px;
+    background: rgba(15, 23, 18, .28);
+}
+
+.virtual-session-clock span {
+    color: rgba(255,255,255,.7);
+    font-size: 9px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.virtual-session-clock strong {
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .08em;
+}
+
 .desktop-status-dot {
     display: inline-block;
     width: 7px;
@@ -3416,6 +3440,17 @@ textarea:focus-visible {
 
 .history-page .asset-name {
     font-weight: 700;
+}
+
+.history-page a.asset-name {
+    color: var(--ira-gold-dark);
+    text-decoration: underline;
+    text-decoration-color: rgba(142, 104, 13, .35);
+    text-underline-offset: 3px;
+}
+
+.history-page a.asset-name:hover {
+    text-decoration-color: currentColor;
 }
 
 .history-page .action-badge {

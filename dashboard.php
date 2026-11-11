@@ -376,7 +376,7 @@ layout_start('Dashboard'); ?><div class="hero">
                                 <button class="secondary" type="submit">Save</button>
                             </form>
                             <?php else: ?>
-                                <small class="muted">Apply the portal migration to assign.</small>
+                                <small class="muted">Apply the laptop portal and session history migrations to assign.</small>
                             <?php endif; ?>
                         </td>
                         <td><?=($a['open_repairs']??0)>0?'Needs attention':'Normal'?></td>

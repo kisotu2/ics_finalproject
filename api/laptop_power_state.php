@@ -15,7 +15,7 @@ if (empty($_SESSION['user_id'])) {
 
 if (!laptop_portal_schema_ready($conn)) {
     http_response_code(503);
-    echo json_encode(['error' => 'The virtual laptop portal migration has not been applied.']);
+    echo json_encode(['error' => 'Apply the laptop portal and virtual power session history migrations before using this feature.']);
     exit;
 }
 
@@ -50,55 +50,104 @@ if (!$laptopId || !in_array($state, ['on', 'off'], true)) {
     exit;
 }
 
-if ($isAdmin) {
-    $stmt = $conn->prepare('SELECT id FROM laptops WHERE id = ?');
-    $stmt->bind_param('i', $laptopId);
-} else {
-    $stmt = $conn->prepare('SELECT id FROM laptops WHERE id = ? AND assigned_to = ?');
-    $stmt->bind_param('ii', $laptopId, $user['id']);
-}
-$stmt->execute();
-$laptop = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
-if (!$laptop) {
-    http_response_code(404);
-    echo json_encode(['error' => 'Laptop not found or you do not have access.']);
-    exit;
-}
-
+$transactionStarted = false;
 try {
     $conn->begin_transaction();
+    $transactionStarted = true;
 
-    $update = $conn->prepare('UPDATE laptops SET virtual_power_state = ? WHERE id = ?');
-    $update->bind_param('si', $state, $laptopId);
-    $update->execute();
-    $update->close();
-
-    $action = $state === 'on' ? 'Virtual interface powered on' : 'Virtual interface powered off';
     if ($isAdmin) {
-        $history = $conn->prepare(
-            'INSERT INTO laptop_history (laptop_id, user_id, admin_id, action_type) VALUES (?, ?, ?, ?)'
+        $stmt = $conn->prepare(
+            'SELECT id, virtual_power_state, virtual_power_started_at,
+                    IF(virtual_power_state = "on" AND virtual_power_started_at IS NOT NULL,
+                       GREATEST(TIMESTAMPDIFF(SECOND, virtual_power_started_at, NOW()), 0), 0) AS elapsed_seconds
+             FROM laptops WHERE id = ? FOR UPDATE'
         );
-        $history->bind_param('iiis', $laptopId, $user['id'], $user['id'], $action);
+        $stmt->bind_param('i', $laptopId);
     } else {
-        $history = $conn->prepare(
-            'INSERT INTO laptop_history (laptop_id, user_id, admin_id, action_type) VALUES (?, ?, NULL, ?)'
+        $stmt = $conn->prepare(
+            'SELECT id, virtual_power_state, virtual_power_started_at,
+                    IF(virtual_power_state = "on" AND virtual_power_started_at IS NOT NULL,
+                       GREATEST(TIMESTAMPDIFF(SECOND, virtual_power_started_at, NOW()), 0), 0) AS elapsed_seconds
+             FROM laptops WHERE id = ? AND assigned_to = ? FOR UPDATE'
         );
-        $history->bind_param('iis', $laptopId, $user['id'], $action);
+        $stmt->bind_param('ii', $laptopId, $user['id']);
     }
-    $history->execute();
-    $history->close();
+    $stmt->execute();
+    $laptop = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-    audit($conn, 'virtual_power_state_changed', 'laptop', $laptopId, [
-        'state' => $state,
-        'physical_device_affected' => false,
-    ]);
+    if (!$laptop) {
+        $conn->rollback();
+        $transactionStarted = false;
+        http_response_code(404);
+        echo json_encode(['error' => 'Laptop not found or you do not have access.']);
+        exit;
+    }
+
+    $elapsedSeconds = (int) $laptop['elapsed_seconds'];
+    $transitioned = $laptop['virtual_power_state'] !== $state;
+    if ($transitioned) {
+        if ($state === 'on') {
+            $update = $conn->prepare(
+                'UPDATE laptops
+                 SET virtual_power_state = "on", virtual_power_started_at = NOW()
+                 WHERE id = ?'
+            );
+            $update->bind_param('i', $laptopId);
+            $elapsedSeconds = 0;
+        } else {
+            $update = $conn->prepare(
+                'UPDATE laptops
+                 SET virtual_power_state = "off", virtual_power_started_at = NULL
+                 WHERE id = ?'
+            );
+            $update->bind_param('i', $laptopId);
+        }
+        $update->execute();
+        $update->close();
+
+        $action = $state === 'on' ? 'Virtual interface powered on' : 'Virtual interface powered off';
+        $durationSeconds = $state === 'off' ? $elapsedSeconds : null;
+        if ($isAdmin) {
+            $history = $conn->prepare(
+                'INSERT INTO laptop_history
+                    (laptop_id, user_id, admin_id, action_type, duration_seconds)
+                 VALUES (?, ?, ?, ?, ?)'
+            );
+            $history->bind_param('iiisi', $laptopId, $user['id'], $user['id'], $action, $durationSeconds);
+        } else {
+            $history = $conn->prepare(
+                'INSERT INTO laptop_history
+                    (laptop_id, user_id, admin_id, action_type, duration_seconds)
+                 VALUES (?, ?, NULL, ?, ?)'
+            );
+            $history->bind_param('iisi', $laptopId, $user['id'], $action, $durationSeconds);
+        }
+        $history->execute();
+        $history->close();
+
+        audit($conn, 'virtual_power_state_changed', 'laptop', $laptopId, [
+            'state' => $state,
+            'physical_device_affected' => false,
+            'duration_seconds' => $durationSeconds,
+        ]);
+    }
+
+    if ($laptop['virtual_power_state'] === $state && $state === 'off') {
+        $elapsedSeconds = 0;
+    }
 
     $conn->commit();
-    echo json_encode(['state' => $state]);
+    $transactionStarted = false;
+    echo json_encode([
+        'state' => $state,
+        'elapsed_seconds' => $elapsedSeconds,
+        'transitioned' => $transitioned,
+    ]);
 } catch (Throwable $exception) {
-    $conn->rollback();
+    if ($transactionStarted) {
+        $conn->rollback();
+    }
     error_log('Virtual laptop state update failed: ' . $exception->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'The virtual device state could not be saved.']);

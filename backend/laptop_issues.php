@@ -21,7 +21,7 @@ function laptop_portal_schema_ready(mysqli $conn): bool
         return false;
     }
 
-    $columns = ['responsible_admin_id', 'virtual_power_state'];
+    $columns = ['responsible_admin_id', 'virtual_power_state', 'virtual_power_started_at'];
     $quotedColumns = "'" . implode("','", $columns) . "'";
     $columnStmt = $conn->prepare(
         "SELECT COUNT(DISTINCT column_name) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'laptops' AND column_name IN ($quotedColumns)"
@@ -45,7 +45,22 @@ function laptop_portal_schema_ready(mysqli $conn): bool
     $maintenanceReady = (int) $maintenanceStmt->get_result()->fetch_assoc()['total'] === 1;
     $maintenanceStmt->close();
 
-    return $maintenanceReady;
+    if (!$maintenanceReady) {
+        return false;
+    }
+
+    $historyDurationStmt = $conn->prepare(
+        "SELECT COUNT(*) AS total
+         FROM information_schema.columns
+         WHERE table_schema = DATABASE()
+           AND table_name = 'laptop_history'
+           AND column_name = 'duration_seconds'"
+    );
+    $historyDurationStmt->execute();
+    $historyDurationReady = (int) $historyDurationStmt->get_result()->fetch_assoc()['total'] === 1;
+    $historyDurationStmt->close();
+
+    return $historyDurationReady;
 }
 
 function create_user_notification(

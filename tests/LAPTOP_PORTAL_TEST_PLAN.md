@@ -3,6 +3,7 @@
 Run these checks only against an isolated test database after applying
 `migrations/20261027_virtual_laptop_portal.sql` and
 `migrations/20261109_laptop_asset_tags_and_portability.sql` and
+`migrations/20261109_virtual_power_session_history.sql` and
 `migrations/20261109_software_expiry_notifications.sql` when needed. Configure
 SMTP in `config.php` before running the licence reminder cases. Do not run
 destructive checks against production data.
@@ -17,6 +18,8 @@ destructive checks against production data.
 | REC-02 | Missing portability data | A manager/senior-rank recommendation shows missing measurements and does not award their portability points; non-senior role scores remain based on the existing needs profile. |
 | VP-01 | Employee device privacy | An employee sees only assigned laptops; requesting another employee's laptop by ID returns an unavailable response and reveals no asset details. |
 | VP-02 | Virtual power state | A permitted user toggles the virtual display; the state persists after reload, an audit/history entry is recorded, and the laptop's actual status and assignment remain unchanged. Invalid CSRF tokens are rejected. |
+| VP-09 | Virtual session timer and history duration | Turn the virtual display on and confirm the on-screen clock advances from seconds to minutes/hours and continues after reload. Turn it off and confirm history records the elapsed seconds and displays the hours/minutes/seconds duration. Repeated same-state requests must not create duplicate history events. |
+| VP-10 | Device-specific history | Click a laptop tag in asset history or the device-history action; only that laptop's history appears. Employees can view only their assigned laptop's history; an unassigned laptop ID is denied. |
 | VP-03 | Issue report | An assigned employee submits a valid report; it enters `pending_admin_review`, the employee and responsible administrator are notified, and the laptop status remains unchanged. |
 | VP-04 | Unauthorized report | An employee attempts to submit against an unassigned laptop ID; the request is rejected and no issue is created. |
 | VP-05 | Approval idempotency | An administrator approves an issue once; exactly one maintenance row is linked. A repeated approval is refused and does not duplicate the job. |

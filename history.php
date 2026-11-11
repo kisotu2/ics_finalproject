@@ -8,7 +8,38 @@ ini_set('display_startup_errors', '1');
 
 require __DIR__ . '/bootstrap.php';
 
-require_login(['admin', 'super_admin']);
+require_login();
+$currentUser = current_user();
+$isAdmin = in_array($currentUser['role'], ['admin', 'super_admin'], true);
+$laptopId = null;
+$selectedLaptop = null;
+if (array_key_exists('laptop_id', $_GET)) {
+    $laptopId = filter_var($_GET['laptop_id'], FILTER_VALIDATE_INT);
+    if ($laptopId === false || $laptopId < 1) {
+        http_response_code(400);
+        exit('Invalid laptop identifier.');
+    }
+
+    if ($isAdmin) {
+        $laptopStmt = $conn->prepare('SELECT id, asset_tag, brand, model FROM laptops WHERE id = ?');
+        $laptopStmt->bind_param('i', $laptopId);
+    } else {
+        $laptopStmt = $conn->prepare(
+            'SELECT id, asset_tag, brand, model FROM laptops WHERE id = ? AND assigned_to = ?'
+        );
+        $laptopStmt->bind_param('ii', $laptopId, $currentUser['id']);
+    }
+    $laptopStmt->execute();
+    $selectedLaptop = $laptopStmt->get_result()->fetch_assoc();
+    $laptopStmt->close();
+    if (!$selectedLaptop) {
+        http_response_code(404);
+        exit('Laptop not found or you do not have access.');
+    }
+} elseif (!$isAdmin) {
+    http_response_code(403);
+    exit('Only administrators can view the complete asset history.');
+}
 
 /* =====================================================
    FILTER VARIABLES
@@ -21,6 +52,12 @@ $laptopParams = [];
 $softwareParams = [];
 $laptopTypes = "";
 $softwareTypes = "";
+
+if ($laptopId !== null) {
+    $laptopWhere .= " AND h.laptop_id = ?";
+    $laptopParams[] = $laptopId;
+    $laptopTypes .= "i";
+}
 
 /* =====================================================
    FILTER: USER NAME
@@ -67,9 +104,21 @@ if (!empty($_GET['to'])) {
    MAIN HISTORY QUERY
 ===================================================== */
 
-$query = "
+$durationColumn = $conn->query(
+    "SELECT COUNT(*) AS total
+     FROM information_schema.columns
+     WHERE table_schema = DATABASE()
+       AND table_name = 'laptop_history'
+       AND column_name = 'duration_seconds'"
+)->fetch_assoc();
+$historyDurationAvailable = (int) ($durationColumn['total'] ?? 0) === 1;
+$durationSelect = $historyDurationAvailable ? 'h.duration_seconds' : 'NULL AS duration_seconds';
+
+$laptopSelect = "
 
 SELECT
+    l.id AS laptop_id,
+    {$durationSelect},
     l.asset_tag COLLATE utf8mb4_unicode_ci AS asset_tag,
     u.id AS user_id,
     u.full_name COLLATE utf8mb4_unicode_ci AS user_name,
@@ -83,10 +132,19 @@ LEFT JOIN users u ON h.user_id = u.id
 LEFT JOIN users a ON h.admin_id = a.id
 
 {$laptopWhere}
+";
 
+if ($laptopId !== null) {
+    $query = $laptopSelect . " ORDER BY action_date DESC";
+    $params = $laptopParams;
+    $types = $laptopTypes;
+} else {
+    $query = $laptopSelect . "
 UNION ALL
 
 SELECT
+    NULL AS laptop_id,
+    NULL AS duration_seconds,
     s.software_name COLLATE utf8mb4_unicode_ci AS asset_tag,
     u.id AS user_id,
     u.full_name COLLATE utf8mb4_unicode_ci AS user_name,
@@ -105,10 +163,11 @@ ORDER BY action_date DESC
 
 ";
 
-$stmt = $conn->prepare($query);
+    $params = array_merge($laptopParams, $softwareParams);
+    $types = $laptopTypes . $softwareTypes;
+}
 
-$params = array_merge($laptopParams, $softwareParams);
-$types = $laptopTypes . $softwareTypes;
+$stmt = $conn->prepare($query);
 
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
@@ -150,26 +209,36 @@ $fromValue = (string) ($_GET['from'] ?? '');
 $toValue = (string) ($_GET['to'] ?? '');
 ?>
 
-<?php layout_start('Asset history'); ?>
+<?php layout_start($selectedLaptop ? 'Device history' : 'Asset history'); ?>
 
 <div class="history-page">
 <section class="hero history-hero">
     <div class="hero-copy">
         <div class="eyebrow">RECORDS &amp; ACTIVITY</div>
-        <h1>Asset history</h1>
-        <p>A clear record of asset and software activity, including who made each change and when.</p>
+        <h1><?= $selectedLaptop ? 'Device history' : 'Asset history' ?></h1>
+        <p><?= $selectedLaptop
+            ? e($selectedLaptop['asset_tag'] . ' · ' . $selectedLaptop['brand'] . ' ' . $selectedLaptop['model']) . ' — device events and virtual session durations.'
+            : 'A clear record of asset and software activity, including who made each change and when.' ?></p>
     </div>
-    <a class="button secondary back-link" href="dashboard.php">&larr; Back to dashboard</a>
+    <?php if ($selectedLaptop): ?>
+        <a class="button secondary back-link" href="<?= $isAdmin ? 'history.php' : 'my_laptop.php?id=' . (int) $selectedLaptop['id'] ?>">&larr; Back</a>
+    <?php else: ?>
+        <a class="button secondary back-link" href="dashboard.php">&larr; Back to dashboard</a>
+    <?php endif; ?>
 </section>
+<?php if (!$historyDurationAvailable): ?>
+    <div class="notice error" role="status">Apply <code>migrations/20261109_virtual_power_session_history.sql</code> to record and display virtual session durations.</div>
+<?php endif; ?>
 
 <section class="panel">
     <div class="panel-header">
         <div>
             <h2>Find a record</h2>
-            <span>Filter activity by user or date range.</span>
+            <span><?= $selectedLaptop ? 'Filter this device’s activity by user or date.' : 'Filter activity by user or date range.' ?></span>
         </div>
     </div>
     <form method="GET" action="history.php" class="filter-grid">
+        <?php if ($laptopId !== null): ?><input type="hidden" name="laptop_id" value="<?= (int) $laptopId ?>"><?php endif; ?>
         <div class="filter-field">
             <label for="user_name">User</label>
             <input id="user_name" list="usernames" name="user_name" placeholder="Search by name" value="<?= e($userNameValue) ?>">
@@ -189,7 +258,7 @@ $toValue = (string) ($_GET['to'] ?? '');
         </div>
         <div class="filter-actions">
             <button type="submit">Apply filters</button>
-            <a class="reset-link" href="history.php">Clear</a>
+            <a class="reset-link" href="<?= $laptopId !== null ? 'history.php?laptop_id=' . (int) $laptopId : 'history.php' ?>">Clear</a>
         </div>
     </form>
 </section>
@@ -228,6 +297,7 @@ $toValue = (string) ($_GET['to'] ?? '');
                         <th>User</th>
                         <th>Recorded by</th>
                         <th>Action</th>
+                        <th>Duration</th>
                         <th>Date and time</th>
                     </tr>
                 </thead>
@@ -240,18 +310,37 @@ $toValue = (string) ($_GET['to'] ?? '');
                             $formattedDate = $timestamp !== false
                                 ? date('M j, Y, g:i a', $timestamp)
                                 : $actionDate;
+                            $durationSeconds = $row['duration_seconds'] === null
+                                ? null
+                                : (int) $row['duration_seconds'];
+                            $formattedDuration = $durationSeconds === null
+                                ? '—'
+                                : sprintf(
+                                    '%dh %dm %ds (%d seconds)',
+                                    intdiv($durationSeconds, 3600),
+                                    intdiv($durationSeconds % 3600, 60),
+                                    $durationSeconds % 60,
+                                    $durationSeconds
+                                );
                             ?>
                             <tr>
-                                <td><span class="asset-name"><?= e($row['asset_tag'] ?? '') ?: 'Unavailable' ?></span></td>
+                                <td>
+                                    <?php if ($row['laptop_id'] !== null): ?>
+                                        <a class="asset-name" href="history.php?laptop_id=<?= (int) $row['laptop_id'] ?>"><?= e($row['asset_tag'] ?? '') ?: 'Unavailable' ?></a>
+                                    <?php else: ?>
+                                        <span class="asset-name"><?= e($row['asset_tag'] ?? '') ?: 'Unavailable' ?></span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= e($row['user_name'] ?? '') ?: '—' ?></td>
                                 <td><?= e($row['admin_name'] ?? '') ?: '—' ?></td>
                                 <td><span class="action-badge"><?= e($row['action_type'] ?? '') ?: 'Unspecified' ?></span></td>
+                                <td><?= e($formattedDuration) ?></td>
                                 <td class="date-cell"><?= e($formattedDate) ?: '—' ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="5">
+                            <td colspan="6">
                                 <div class="empty-state">
                                     <strong>No matching activity</strong>
                                     Try changing your filters or clear them to see all records.

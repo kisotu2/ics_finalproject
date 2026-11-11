@@ -316,7 +316,8 @@ For an existing installation:
 2. Confirm the database contains the `laptops` table and has already received the other migrations required by this version.
 3. Apply `migrations/20261027_virtual_laptop_portal.sql` after checking which columns and tables already exist. Change its initial `USE` statement to the configured database if needed.
 4. Apply `migrations/20261109_laptop_asset_tags_and_portability.sql`. Change its initial `USE` statement if needed; it adds device weight and screen-size fields, seeds 500 available laptop tags, and reserves pool entries for matching existing laptops.
-5. Test migration and portal behavior in a staging copy before applying to production.
+5. Apply `migrations/20261109_virtual_power_session_history.sql`, changing its initial `USE` statement if needed. It adds virtual session start times and a duration field to laptop history.
+6. Test migration and portal behavior in a staging copy before applying to production.
 
 The portal migration adds virtual power state, responsible administrators, issue reporting, notifications and linked maintenance records. Back up first and do not drop issue tables while they contain reports.
 
@@ -327,6 +328,8 @@ Administrators manually register laptops from the dashboard, then assign them to
 New laptop asset tags are selected from the `laptop_asset_tag_pool` table. The available tag is shown on the registration form before saving, then claimed transactionally so another laptop cannot receive it. The initial pool contains `IRA-LAP-001` through `IRA-LAP-500`; add more rows to this table if the pool is exhausted. The unique laptop asset-tag index remains the final duplicate guard.
 
 Enter laptop weight and screen size when known. For managers, senior managers and directors, the recommendation score includes portability: laptops at or under 1.5 kg and 14 inches receive the strongest portability score. Unknown measurements do not receive portability points.
+
+The virtual laptop display includes an elapsed session clock while it is on. Turning it off stores the completed duration in seconds in `laptop_history`, shown as hours, minutes, and seconds. Laptop asset tags in the history table link to that device’s filtered history; employees can open history only for their own assigned laptop.
 
 ## Software Licence Expiry Reminders
 

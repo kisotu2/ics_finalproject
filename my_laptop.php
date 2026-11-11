@@ -5,6 +5,15 @@ require __DIR__ . '/bootstrap.php';
 require_login();
 require_once __DIR__ . '/backend/laptop_issues.php';
 
+function format_virtual_duration(int $seconds): string
+{
+    $hours = intdiv($seconds, 3600);
+    $minutes = intdiv($seconds % 3600, 60);
+    $remainingSeconds = $seconds % 60;
+
+    return sprintf('%02d:%02d:%02d', $hours, $minutes, $remainingSeconds);
+}
+
 $user = current_user();
 $isAdmin = in_array($user['role'], ['admin', 'super_admin'], true);
 $portalReady = laptop_portal_schema_ready($conn);
@@ -13,8 +22,8 @@ if (!$portalReady) {
     layout_start('My Laptop');
     ?>
     <section class="panel laptop-empty">
-        <h1>My Laptop setup required</h1>
-        <p>The virtual laptop portal is not enabled yet. An administrator must back up the database and apply <code>migrations/20261027_virtual_laptop_portal.sql</code>.</p>
+        <h1>My Laptop upgrade required</h1>
+        <p>An administrator must back up the database and apply <code>migrations/20261027_virtual_laptop_portal.sql</code> and <code>migrations/20261109_virtual_power_session_history.sql</code> before the device portal and session history can be used.</p>
         <?php if ($isAdmin): ?><a class="button" href="add_laptop.php">Register a laptop</a><?php endif; ?>
     </section>
     <?php
@@ -138,6 +147,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_
 if ($isAdmin) {
     $stmt = $conn->prepare(
         'SELECT l.*, u.full_name AS assigned_name,
+                IF(l.virtual_power_state = "on" AND l.virtual_power_started_at IS NOT NULL,
+                   GREATEST(TIMESTAMPDIFF(SECOND, l.virtual_power_started_at, NOW()), 0), 0) AS virtual_elapsed_seconds,
+                (SELECT h.duration_seconds FROM laptop_history h
+                 WHERE h.laptop_id = l.id AND h.duration_seconds IS NOT NULL
+                 ORDER BY h.id DESC LIMIT 1) AS last_virtual_session_seconds,
                 (SELECT COUNT(*) FROM laptop_issues i
                  WHERE i.laptop_id = l.id
                    AND i.status NOT IN ("rejected", "duplicate", "resolved")) AS open_issues
@@ -148,6 +162,11 @@ if ($isAdmin) {
 } else {
     $stmt = $conn->prepare(
         'SELECT l.*, u.full_name AS assigned_name,
+                IF(l.virtual_power_state = "on" AND l.virtual_power_started_at IS NOT NULL,
+                   GREATEST(TIMESTAMPDIFF(SECOND, l.virtual_power_started_at, NOW()), 0), 0) AS virtual_elapsed_seconds,
+                (SELECT h.duration_seconds FROM laptop_history h
+                 WHERE h.laptop_id = l.id AND h.duration_seconds IS NOT NULL
+                 ORDER BY h.id DESC LIMIT 1) AS last_virtual_session_seconds,
                 (SELECT COUNT(*) FROM laptop_issues i
                  WHERE i.laptop_id = l.id
                    AND i.status NOT IN ("rejected", "duplicate", "resolved")) AS open_issues
@@ -287,6 +306,10 @@ layout_start('My Laptop');
                             <div>
                                 <span class="desktop-status-dot"></span>
                                 <p class="desktop-device"><?= e($selectedLaptop['asset_tag']) ?></p>
+                                <div class="virtual-session-clock" aria-live="off">
+                                    <span>Virtual session elapsed</span>
+                                    <strong id="virtual-session-timer"><?= e(format_virtual_duration((int) $selectedLaptop['virtual_elapsed_seconds'])) ?></strong>
+                                </div>
                                 <p class="desktop-note">This is a visual representation of the asset, not a connection to the physical laptop.</p>
                             </div>
                             <a class="desktop-details-link" href="#device-details">View device details ↓</a>
@@ -295,6 +318,13 @@ layout_start('My Laptop');
                             <span class="screen-off-indicator"></span>
                             <strong>Powered off</strong>
                             <small>Virtual display only</small>
+                            <small id="last-session-duration">
+                                <?php if ($selectedLaptop['last_virtual_session_seconds'] !== null): ?>
+                                    Last session: <?= e(format_virtual_duration((int) $selectedLaptop['last_virtual_session_seconds'])) ?>
+                                <?php else: ?>
+                                    No completed virtual session yet
+                                <?php endif; ?>
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -324,6 +354,7 @@ layout_start('My Laptop');
             <div class="virtual-actions">
                 <a class="button" href="report_laptop_issue.php?laptop_id=<?= (int) $selectedLaptop['id'] ?>">Report an issue</a>
                 <a class="button secondary" href="#device-details">Device details</a>
+                <a class="button secondary" href="history.php?laptop_id=<?= (int) $selectedLaptop['id'] ?>">Device history</a>
             </div>
         </section>
 
@@ -405,6 +436,36 @@ layout_start('My Laptop');
     const screenOff = document.getElementById('virtual-screen-off');
     const label = document.getElementById('power-label');
     const error = document.getElementById('power-error');
+    const timer = document.getElementById('virtual-session-timer');
+    const lastSession = document.getElementById('last-session-duration');
+    let elapsedBase = Number(<?= (int) $selectedLaptop['virtual_elapsed_seconds'] ?>);
+    let elapsedStartedAt = Date.now();
+    let timerInterval = null;
+    const displayDuration = (seconds) => {
+        const total = Math.max(0, Math.floor(seconds));
+        const hours = String(Math.floor(total / 3600)).padStart(2, '0');
+        const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+        const remainingSeconds = String(total % 60).padStart(2, '0');
+        return `${hours}:${minutes}:${remainingSeconds}`;
+    };
+    const updateTimer = () => {
+        timer.textContent = displayDuration(elapsedBase + (Date.now() - elapsedStartedAt) / 1000);
+    };
+    const startTimer = () => {
+        elapsedStartedAt = Date.now();
+        updateTimer();
+        if (timerInterval === null) timerInterval = window.setInterval(updateTimer, 1000);
+    };
+    const stopTimer = (seconds) => {
+        if (timerInterval !== null) {
+            window.clearInterval(timerInterval);
+            timerInterval = null;
+        }
+        elapsedBase = seconds;
+        timer.textContent = displayDuration(seconds);
+        lastSession.textContent = `Last session: ${displayDuration(seconds)}`;
+    };
+    if (button.getAttribute('aria-pressed') === 'true') startTimer();
 
     button.addEventListener('click', async () => {
         const nextState = button.getAttribute('aria-pressed') === 'true' ? 'off' : 'on';
@@ -429,6 +490,13 @@ layout_start('My Laptop');
             screenOff.hidden = isOn;
             button.setAttribute('aria-pressed', String(isOn));
             label.textContent = isOn ? 'Turn virtual display off' : 'Turn virtual display on';
+            if (isOn) {
+                elapsedBase = Number(result.elapsed_seconds) || 0;
+                startTimer();
+                lastSession.textContent = 'Session in progress';
+            } else {
+                stopTimer(Number(result.elapsed_seconds) || 0);
+            }
         } catch (requestError) {
             error.textContent = requestError.message;
             error.hidden = false;

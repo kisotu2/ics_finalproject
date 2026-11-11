@@ -12,7 +12,7 @@ if (!laptop_portal_schema_ready($conn)) {
     ?>
     <section class="panel">
         <h1>Issue review setup required</h1>
-        <p>Back up the database and apply <code>migrations/20261027_virtual_laptop_portal.sql</code> before using issue review.</p>
+        <p>Back up the database and apply <code>migrations/20261027_virtual_laptop_portal.sql</code> and <code>migrations/20261109_virtual_power_session_history.sql</code> before using issue review.</p>
     </section>
     <?php
     layout_end();

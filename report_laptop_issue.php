@@ -13,7 +13,7 @@ if (!laptop_portal_schema_ready($conn)) {
     ?>
     <section class="panel">
         <h1>Issue reporting setup required</h1>
-        <p>An administrator must apply <code>migrations/20261027_virtual_laptop_portal.sql</code> before issue reporting is available.</p>
+        <p>An administrator must apply <code>migrations/20261027_virtual_laptop_portal.sql</code> and <code>migrations/20261109_virtual_power_session_history.sql</code> before issue reporting is available.</p>
     </section>
     <?php
     layout_end();
