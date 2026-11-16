@@ -584,6 +584,16 @@ $risks = $conn->query("
 
         l.warranty_expiry,
 
+        u.active_hours_30d,
+
+        u.avg_active_hours_per_day_30d,
+
+        u.crash_count_30d,
+
+        u.usage_records_30d,
+
+        u.last_usage_date,
+
         COUNT(m.id) AS repairs,
 
         COALESCE(
@@ -612,6 +622,30 @@ $risks = $conn->query("
 
         ON m.laptop_id = l.id
 
+    LEFT JOIN (
+
+        SELECT
+
+            laptop_id,
+
+            SUM(active_hours) AS active_hours_30d,
+
+            AVG(active_hours) AS avg_active_hours_per_day_30d,
+
+            SUM(crash_count) AS crash_count_30d,
+
+            COUNT(*) AS usage_records_30d,
+
+            MAX(usage_date) AS last_usage_date
+
+        FROM device_usage_daily
+
+        WHERE usage_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+
+        GROUP BY laptop_id
+
+    ) u ON u.laptop_id = l.id
+
     WHERE l.status NOT IN ('Retired', 'Disposed')
 
     GROUP BY
@@ -626,7 +660,17 @@ $risks = $conn->query("
 
         l.status,
 
-        l.warranty_expiry
+        l.warranty_expiry,
+
+        u.active_hours_30d,
+
+        u.avg_active_hours_per_day_30d,
+
+        u.crash_count_30d,
+
+        u.usage_records_30d,
+
+        u.last_usage_date
 
     ORDER BY
 
@@ -1182,7 +1226,7 @@ layout_start('Maintenance');
 
                 <th>
 
-                    30-Day Usage
+                    Device Usage · Last 30 Days
 
                 </th>
 
@@ -1338,55 +1382,33 @@ layout_start('Maintenance');
 
                 </td>
 
-                <!-- 30-day usage -->
+                <!-- Usage values from device_usage_daily; the prediction call above reads the same records. -->
 
                 <td>
 
-                    <?php if (
+                    <?php if ($r['active_hours_30d'] === null): ?>
 
-                        $prediction['success'] ?? false
-
-                    ): ?>
-
-                        <?= number_format(
-
-                            (float)$prediction['features']['active_hours_30d'],
-
-                            1
-
-                        ) ?>
-
-                        hrs
-
-                        <br>
-
-                        <?= (int)$prediction['features']['crash_count_30d'] ?>
-
-                        crashes
-
-                        <?php if (
-
-                            $usageRecords === 0
-
-                        ): ?>
-
-                            <br>
-
-                            <small class="muted">
-
-                                No records in last 30 days
-
-                            </small>
-
-                        <?php endif; ?>
+                        <span class="muted">No usage recorded in the last 30 days</span>
 
                     <?php else: ?>
 
-                        <span class="muted">
+                        <b><?= number_format((float)$r['active_hours_30d'], 1) ?> active hours total</b>
 
-                            Unavailable
+                        <br>
 
-                        </span>
+                        <small><?= number_format((float)$r['avg_active_hours_per_day_30d'], 1) ?> hours per recorded day · <?= (int)$r['usage_records_30d'] ?> days recorded</small>
+
+                        <br>
+
+                        <small><?= (int)$r['crash_count_30d'] ?> crashes · latest report <?= e((string)$r['last_usage_date']) ?></small>
+
+                        <?php if (!empty($prediction['success'])): ?>
+
+                            <br>
+
+                            <small>Model input: <?= number_format((float)($prediction['features']['active_hours_30d'] ?? $r['active_hours_30d']), 1) ?> active hours</small>
+
+                        <?php endif; ?>
 
                     <?php endif; ?>
 
