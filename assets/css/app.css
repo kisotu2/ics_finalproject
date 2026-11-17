@@ -838,6 +838,21 @@ textarea {
         var(--shadow);
 }
 
+.card.metric.is-active {
+
+    border-color: var(--ira-gold);
+
+    box-shadow:
+        0 0 0 2px rgba(176,129,22,.16),
+        var(--shadow-sm);
+}
+
+.card.metric:focus-visible {
+
+    outline: 3px solid var(--ira-gold);
+    outline-offset: 3px;
+}
+
 
 .metric-top {
 

@@ -143,6 +143,15 @@ CREATE TABLE IF NOT EXISTS softwares (
     UNIQUE KEY uq_software_vendor_version (software_name, vendor, version)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS software_department_eligibility (
+    software_id INT NOT NULL,
+    department VARCHAR(150) NOT NULL,
+    PRIMARY KEY (software_id, department),
+    INDEX idx_software_department_department (department),
+    CONSTRAINT fk_software_department_software
+        FOREIGN KEY (software_id) REFERENCES softwares(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS software_assignments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     software_id INT NOT NULL,
