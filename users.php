@@ -287,9 +287,9 @@ layout_start('Users');
                             </div>
 
                             <strong>
-                                <?= e(
-                                    $user['full_name']
-                                ) ?>
+                                <a class="asset-name" href="user_history.php?id=<?= (int) $user['id'] ?>">
+                                    <?= e($user['full_name']) ?>
+                                </a>
                             </strong>
 
                         </div>

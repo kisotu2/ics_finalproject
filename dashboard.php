@@ -378,10 +378,10 @@ layout_start('Dashboard'); ?><div class="hero">
             <tbody>
             <?php $hasAssets = false; while($a=$assets->fetch_assoc()): $hasAssets = true; ?>
                 <tr>
-                    <td><b><?=e($a['asset_tag'])?></b><br><small>Serial: <?=e($a['serial_number'])?></small></td>
+                    <td><a class="asset-name" href="history.php?laptop_id=<?=(int)$a['id']?>"><b><?=e($a['asset_tag'])?></b></a><br><small>Serial: <?=e($a['serial_number'])?></small></td>
                     <td><?=e($a['brand'].' '.$a['model'])?><br><small><?=e($a['department']??'')?></small></td>
                     <td><?=e($a['status'])?></td>
-                    <td><?=e($a['full_name']??($_SESSION['name']??'Unassigned'))?></td>
+                    <td><?php if (!empty($a['full_name'])): ?><a class="asset-name" href="user_history.php?id=<?=(int)$a['assigned_to']?>"><?=e($a['full_name'])?></a><?php else: ?>Unassigned<?php endif; ?></td>
                     <?php if($admin):?>
                         <td>
                             <span><?=e($a['responsible_admin_name'] ?? 'Not assigned')?></span>

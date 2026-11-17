@@ -207,6 +207,24 @@ ORDER BY full_name
 $userNameValue = (string) ($_GET['user_name'] ?? '');
 $fromValue = (string) ($_GET['from'] ?? '');
 $toValue = (string) ($_GET['to'] ?? '');
+$deviceUsers = [];
+if ($laptopId !== null) {
+    $deviceUsersStmt = $conn->prepare(
+        'SELECT u.id, u.full_name, MIN(h.action_date) AS first_used,
+                MAX(h.action_date) AS last_seen,
+                MAX(CASE WHEN l.assigned_to = u.id THEN 1 ELSE 0 END) AS is_current
+         FROM users u
+         LEFT JOIN laptop_history h ON h.user_id = u.id AND h.laptop_id = ?
+         LEFT JOIN laptops l ON l.id = ?
+         WHERE h.id IS NOT NULL OR l.assigned_to = u.id
+         GROUP BY u.id, u.full_name
+         ORDER BY is_current DESC, u.full_name'
+    );
+    $deviceUsersStmt->bind_param('ii', $laptopId, $laptopId);
+    $deviceUsersStmt->execute();
+    $deviceUsers = $deviceUsersStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $deviceUsersStmt->close();
+}
 ?>
 
 <?php layout_start($selectedLaptop ? 'Device history' : 'Asset history'); ?>
@@ -281,6 +299,47 @@ $toValue = (string) ($_GET['to'] ?? '');
     </article>
 </section>
 
+<?php if ($selectedLaptop): ?>
+    <section class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Users of this laptop</h2>
+                <span>Current and past users recorded in the device history.</span>
+            </div>
+        </div>
+        <?php if ($deviceUsers): ?>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>User</th><th>First recorded use</th><th>Last recorded activity</th><th>Assignment</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($deviceUsers as $deviceUser): ?>
+                        <?php
+                        $mayOpenUser = $isAdmin || (int) $deviceUser['id'] === $currentUser['id'];
+                        $firstUsed = $deviceUser['first_used'] ? date('M j, Y', strtotime($deviceUser['first_used'])) : '—';
+                        $lastSeen = $deviceUser['last_seen'] ? date('M j, Y, g:i a', strtotime($deviceUser['last_seen'])) : '—';
+                        ?>
+                        <tr>
+                            <td>
+                                <?php if ($mayOpenUser): ?>
+                                    <a class="asset-name" href="user_history.php?id=<?= (int) $deviceUser['id'] ?>"><?= e($deviceUser['full_name']) ?></a>
+                                <?php else: ?>
+                                    <?= e($deviceUser['full_name']) ?>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= e($firstUsed) ?></td>
+                            <td><?= e($lastSeen) ?></td>
+                            <td><?= (int) $deviceUser['is_current'] === 1 ? 'Currently assigned' : 'Previous user' ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php else: ?>
+            <div class="empty-state"><strong>No users recorded</strong>This laptop has no user assignment history yet.</div>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>
+
 <div class="history-layout">
     <section class="panel">
         <div class="panel-header">
@@ -331,7 +390,13 @@ $toValue = (string) ($_GET['to'] ?? '');
                                         <span class="asset-name"><?= e($row['asset_tag'] ?? '') ?: 'Unavailable' ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?= e($row['user_name'] ?? '') ?: '—' ?></td>
+                                <td>
+                                    <?php if ($row['user_id'] !== null && ($isAdmin || (int) $row['user_id'] === $currentUser['id'])): ?>
+                                        <a class="asset-name" href="user_history.php?id=<?= (int) $row['user_id'] ?>"><?= e($row['user_name'] ?? '') ?: '—' ?></a>
+                                    <?php else: ?>
+                                        <?= e($row['user_name'] ?? '') ?: '—' ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= e($row['admin_name'] ?? '') ?: '—' ?></td>
                                 <td><span class="action-badge"><?= e($row['action_type'] ?? '') ?: 'Unspecified' ?></span></td>
                                 <td><?= e($formattedDuration) ?></td>
