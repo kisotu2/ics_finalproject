@@ -1,8 +1,6 @@
 <?php
 declare(strict_types=1);
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
 /**
  * Smart Asset Management System
  * Maintenance Risk Details Page
@@ -116,6 +114,30 @@ if ($laptopId === false || $laptopId === null) {
 
 $laptopId = (int)$laptopId;
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    if (($_POST['action'] ?? '') !== 'save_prediction') {
+        http_response_code(400);
+        exit('Unsupported maintenance-risk action.');
+    }
+
+    $savedResult = maintenance_risk($laptopId, true);
+    if (!empty($savedResult['success']) && !empty($savedResult['prediction_saved'])) {
+        $message = 'Prediction saved: ' . ($savedResult['level'] ?? 'Unknown') .
+            ' (' . number_format((float) ($savedResult['score'] ?? 0) * 100, 2) . '%).';
+        if (!empty($savedResult['notification_sent'])) {
+            $message .= ' The responsible administrator was notified.';
+        } elseif (!empty($savedResult['notification_error'])) {
+            $message .= ' ' . $savedResult['notification_error'];
+        }
+        flash($message, !empty($savedResult['notification_error']) ? 'error' : 'success');
+    } else {
+        flash('The prediction could not be saved: ' . ($savedResult['error'] ?? 'Unknown error.'), 'error');
+    }
+    header('Location: maintenance_risk.php?laptop_id=' . $laptopId);
+    exit;
+}
+
 /*
 |--------------------------------------------------------------------------
 | Load Laptop Details
@@ -172,7 +194,7 @@ try {
 */
 
 try {
-    $prediction = maintenance_risk($laptopId, true);
+    $prediction = maintenance_risk($laptopId, false);
 
     if (!is_array($prediction)) {
         $prediction = [
@@ -203,6 +225,7 @@ $scorePercentage = null;
 $modelVersion = 'Not available';
 $predictionSource = 'Unknown';
 $features = [];
+$imputedFeatures = [];
 $predictionSaved = false;
 $notificationSent = false;
 $notificationError = '';
@@ -234,6 +257,9 @@ if ($predictionAvailable) {
             ? $prediction['features']
             : [];
 
+        $imputedFeatures = is_array($prediction['imputed_features'] ?? null)
+            ? $prediction['imputed_features']
+            : [];
         $predictionSaved = ($prediction['prediction_saved'] ?? false) === true;
         $notificationSent = ($prediction['notification_sent'] ?? false) === true;
         $notificationError = (string) ($prediction['notification_error'] ?? '');
@@ -704,6 +730,11 @@ layout_start('Maintenance Risk');
 
     <section class="panel maintenance-panel">
         <h2>Predictive Maintenance Result</h2>
+        <form method="post" class="maintenance-predict-form">
+            <input type="hidden" name="csrf" value="<?= maintenance_page_escape(csrf()) ?>">
+            <input type="hidden" name="action" value="save_prediction">
+            <button type="submit">Save a fresh prediction</button>
+        </form>
 
         <?php if ($predictionAvailable): ?>
 
@@ -823,9 +854,14 @@ layout_start('Maintenance Risk');
                 </div>
             </div>
 
+            <?php if ($imputedFeatures !== []): ?>
+                <p class="maintenance-section-note">
+                    Missing recent measurements used training-set average values for: <?= maintenance_page_escape(implode(', ', $imputedFeatures)) ?>.
+                </p>
+            <?php endif; ?>
             <p class="maintenance-section-note">
                 The score is a model estimate, not a guarantee of future failure.
-                Risk categories depend on the thresholds configured by the model API.
+                Risk categories use the same thresholds in the Flask and local fallback models.
             </p>
 
         <?php else: ?>

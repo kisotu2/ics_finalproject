@@ -216,67 +216,32 @@ function maintenance_risk(
     }
 
 
-    /*
-     * ---------------------------------------------------------
-     * 3. Calculate asset age
-     * ---------------------------------------------------------
-     */
-
-    $assetAgeYears = 0;
-
+    /* ---------------------------------------------------------
+     * 3-4. Asset age and signed warranty days
+     * --------------------------------------------------------- */
+    $today = new DateTimeImmutable('today');
+    $assetAgeYears = null;
     if (!empty($laptop['purchase_date'])) {
-
         try {
-
-            $purchaseDate = new DateTime(
-                $laptop['purchase_date']
-            );
-
-            $today = new DateTime();
-
-            $days = $purchaseDate->diff($today)->days;
-
-            $assetAgeYears = $days / 365.25;
-
+            $purchaseDate = new DateTimeImmutable($laptop['purchase_date']);
+            $assetAgeYears = max(0, ($today->getTimestamp() - $purchaseDate->getTimestamp()) / 31557600);
         } catch (Throwable $e) {
-
-            $assetAgeYears = 0;
+            $assetAgeYears = null;
         }
     }
 
-
-    /*
-     * ---------------------------------------------------------
-     * 4. Calculate warranty days remaining
-     * ---------------------------------------------------------
-     */
-
-    $warrantyDaysRemaining = 0;
-
+    $warrantyDaysRemaining = null;
     if (!empty($laptop['warranty_expiry'])) {
-
         try {
-
-            $today = new DateTime();
-
-            $warrantyExpiry = new DateTime(
-                $laptop['warranty_expiry']
-            );
-
-            if ($warrantyExpiry > $today) {
-
-                $warrantyDaysRemaining =
-                    $today->diff($warrantyExpiry)->days;
-            }
-
+            $warrantyExpiry = new DateTimeImmutable($laptop['warranty_expiry']);
+            $warrantyDaysRemaining = (int) $today->diff($warrantyExpiry)->format('%r%a');
         } catch (Throwable $e) {
-
-            $warrantyDaysRemaining = 0;
+            $warrantyDaysRemaining = null;
         }
     }
 
 
-    /*
+        /*
      * ---------------------------------------------------------
      * 5. Maintenance history
      * ---------------------------------------------------------
@@ -337,63 +302,53 @@ function maintenance_risk(
     }
 
 
-    /*
-     * ---------------------------------------------------------
-     * 6. Usage data for the last 30 days
-     * ---------------------------------------------------------
-     */
-
+    /* ---------------------------------------------------------
+     * 6-7. Usage and battery data from the last 30 days
+     * --------------------------------------------------------- */
     $usageRecords30d = 0;
-    $activeHours30d = 0;
-    $crashCount30d = 0;
+    $activeHours30d = null;
+    $crashCount30d = null;
+    $batteryHealth = null;
 
     try {
-
         $stmt = $conn->prepare("
-            SELECT
-                COUNT(*) AS usage_records_30d,
-
-                COALESCE(
-                    SUM(active_hours),
-                    0
-                ) AS active_hours_30d,
-
-                COALESCE(
-                    SUM(crash_count),
-                    0
-                ) AS crash_count_30d
-
+            SELECT COUNT(*) AS usage_records_30d,
+                   SUM(active_hours) AS active_hours_30d,
+                   SUM(crash_count) AS crash_count_30d
             FROM device_usage_daily
-
             WHERE laptop_id = ?
-
-              AND usage_date >=
-                  DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-
+              AND usage_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
               AND usage_date <= CURDATE()
         ");
-
-        $stmt->bind_param("i", $laptopId);
-
+        $stmt->bind_param('i', $laptopId);
         $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        $usage = $result->fetch_assoc();
-
+        $usage = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        $usageRecords30d =
-            (int)($usage['usage_records_30d'] ?? 0);
+        $usageRecords30d = (int) ($usage['usage_records_30d'] ?? 0);
+        if ($usageRecords30d > 0) {
+            $activeHours30d = (float) $usage['active_hours_30d'];
+            $crashCount30d = (float) $usage['crash_count_30d'];
+        }
 
-        $activeHours30d =
-            (float)($usage['active_hours_30d'] ?? 0);
-
-        $crashCount30d =
-            (int)($usage['crash_count_30d'] ?? 0);
-
+        $stmt = $conn->prepare("
+            SELECT battery_health_percent
+            FROM device_usage_daily
+            WHERE laptop_id = ?
+              AND battery_health_percent IS NOT NULL
+              AND usage_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+              AND usage_date <= CURDATE()
+            ORDER BY usage_date DESC, id DESC
+            LIMIT 1
+        ");
+        $stmt->bind_param('i', $laptopId);
+        $stmt->execute();
+        $battery = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($battery && $battery['battery_health_percent'] !== null) {
+            $batteryHealth = (float) $battery['battery_health_percent'];
+        }
     } catch (Throwable $e) {
-
         return [
             'success' => false,
             'error' => 'Unable to retrieve device usage information.',
@@ -406,90 +361,45 @@ function maintenance_risk(
     }
 
 
-    /*
-     * ---------------------------------------------------------
-     * 7. Latest battery health
-     * ---------------------------------------------------------
-     */
-
-    $batteryHealth = 100;
-
-    try {
-
-        $stmt = $conn->prepare("
-            SELECT
-                battery_health_percent
-
-            FROM device_usage_daily
-
-            WHERE laptop_id = ?
-
-              AND battery_health_percent IS NOT NULL
-
-            ORDER BY
-                usage_date DESC,
-                id DESC
-
-            LIMIT 1
-        ");
-
-        $stmt->bind_param("i", $laptopId);
-
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        $battery = $result->fetch_assoc();
-
-        $stmt->close();
-
-        if (
-            $battery &&
-            $battery['battery_health_percent'] !== null
-        ) {
-
-            $batteryHealth =
-                (float)$battery['battery_health_percent'];
-        }
-
-    } catch (Throwable $e) {
-
-        $batteryHealth = 100;
-    }
-
-
-    /*
-     * ---------------------------------------------------------
-     * 8. Build exactly the seven model features
-     * ---------------------------------------------------------
-     */
-
-    $features = [
-
-        'repair_count' =>
-            $repairCount,
-
-        'open_repair_count' =>
-            $openRepairCount,
-
-        'asset_age_years' =>
-            round($assetAgeYears, 4),
-
-        'warranty_days_remaining' =>
-            $warrantyDaysRemaining,
-
-        'active_hours_30d' =>
-            round($activeHours30d, 2),
-
-        'crash_count_30d' =>
-            $crashCount30d,
-
-        'battery_health_percent' =>
-            $batteryHealth
+        /* ---------------------------------------------------------
+     * 8. Build features in the trained artifact's exact order.
+     * Missing measurements use the training-set mean, which is
+     * neutral after the artifact's StandardScaler preprocessing.
+     * --------------------------------------------------------- */
+    $featureValues = [
+        'repair_count' => (float) $repairCount,
+        'open_repair_count' => (float) $openRepairCount,
+        'asset_age_years' => $assetAgeYears,
+        'warranty_days_remaining' => $warrantyDaysRemaining,
+        'active_hours_30d' => $activeHours30d,
+        'crash_count_30d' => $crashCount30d,
+        'battery_health_percent' => $batteryHealth,
     ];
 
+    try {
+        $trainingMeans = maintenance_model_feature_means();
+    } catch (Throwable $e) {
+        return [
+            'success' => false,
+            'error' => 'Unable to load the trained maintenance model features.',
+            'score' => 0,
+            'level' => 'Unknown',
+            'version' => 'logistic-regression-v1',
+            'features' => []
+        ];
+    }
 
-    /*
+    $imputedFeatures = [];
+    foreach ($featureValues as $name => $value) {
+        if ($value === null) {
+            $featureValues[$name] = $trainingMeans[$name];
+            $imputedFeatures[] = $name;
+        }
+    }
+    $features = $featureValues;
+
+
+        /*
      * ---------------------------------------------------------
      * 9. Call Flask ML API
      * ---------------------------------------------------------
@@ -645,8 +555,11 @@ function maintenance_risk(
      * ---------------------------------------------------------
      */
 
-    $modelVersion =
-        'logistic-regression-v1';
+    $modelVersion = (string) (
+        $prediction['model_version']
+        ?? maintenance_model_artifact()['model_version']
+        ?? 'logistic-regression-v1'
+    );
 
 
     /*
@@ -821,6 +734,9 @@ function maintenance_risk(
 
         'features' =>
             $features,
+
+        'imputed_features' =>
+            $imputedFeatures,
 
         'usage_records_30d' =>
             $usageRecords30d,

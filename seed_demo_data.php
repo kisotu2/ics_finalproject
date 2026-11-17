@@ -10,10 +10,12 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 
-$host = '127.0.0.1';
+$configFile = __DIR__ . '/config.php';
+$config = is_file($configFile) ? require $configFile : [];
+$host = getenv('ASSET_DB_HOST') ?: ($config['db_host'] ?? '127.0.0.1');
 $dbname = 'ira_assets_recovered';
-$dbUser = 'root';
-$dbPass = '';
+$dbUser = getenv('ASSET_DB_USER') ?: ($config['db_user'] ?? 'root');
+$dbPass = getenv('ASSET_DB_PASSWORD') ?: ($config['db_password'] ?? '');
 
 try {
     $pdo = new PDO(
@@ -26,10 +28,8 @@ try {
         ]
     );
 } catch (PDOException $e) {
-    exit(
-        'Database connection failed. Check $dbname, $dbUser and $dbPass. ' .
-        'Details: ' . htmlspecialchars($e->getMessage())
-    );
+    error_log('Demo seeding database connection failed: ' . $e->getMessage());
+    exit('Database connection failed. Check the local database service and configuration.');
 }
 
 $users = [

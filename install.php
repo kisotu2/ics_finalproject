@@ -7,6 +7,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
      $sql=file_get_contents(__DIR__.'/database.sql'); 
      foreach(array_filter(array_map('trim', preg_split('/;\s*(?:\r?\n|$)/', $sql))) as $statement) $db->query($statement); 
      $message='Database installed. Copy config.example.php to config.php, then create the first super administrator.'; }
-    catch(Throwable $e) { $message='Installation failed: '.$e->getMessage(); }
+    catch(Throwable $e) { error_log('Database installation failed: '.$e->getMessage()); $message='Installation failed. Check the server log and local database configuration.'; }
 }
 ?><!doctype html><title>Install Asset Management</title><link rel="stylesheet" href="assets/css/app.css"><main><h1>Install Asset Management</h1><p>This creates the local MySQL schema used by the application.</p><?php if($message): ?><p class="notice"><?=htmlspecialchars($message)?></p><?php endif; ?><form method="post" class="panel"><label>MySQL host<input name="host" value="<?=htmlspecialchars($host)?>"></label><label>MySQL user<input name="user" value="<?=htmlspecialchars($user)?>"></label><label>Password<input name="password" type="password"></label><button>Install database</button></form></main>

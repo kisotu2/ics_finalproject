@@ -1,5 +1,6 @@
+-- Optional legacy tables for location, accessory and approval features.
+USE ira_assets_recovered;
 
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS software_history (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -137,6 +137,28 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $currentAsset = $current->get_result()->fetch_assoc();
 
         $assignedUser = $currentAsset['assigned_to'] ?? null;
+        if (!$currentAsset) {
+            flash('Laptop not found.', 'error');
+            header('Location: dashboard.php');
+            exit;
+        }
+        if ($assignedUser !== null && in_array($status, ['Available', 'Retired', 'Disposed'], true)) {
+            flash('Record the laptop return before changing it to available, retired or disposed.', 'error');
+            header('Location: unassign_device.php?laptop_id=' . $asset);
+            exit;
+        }
+        if (in_array($status, ['Available', 'Retired', 'Disposed'], true)) {
+            $openMaintenance = $conn->prepare("SELECT COUNT(*) AS total FROM maintenance_records WHERE laptop_id = ? AND status IN ('open','in_progress')");
+            $openMaintenance->bind_param('i', $asset);
+            $openMaintenance->execute();
+            $hasOpenMaintenance = (int) $openMaintenance->get_result()->fetch_assoc()['total'] > 0;
+            $openMaintenance->close();
+            if ($hasOpenMaintenance) {
+                flash('Resolve open maintenance work before making this asset available, retired or disposed.', 'error');
+                header('Location: dashboard.php');
+                exit;
+            }
+        }
 
         $s = $conn->prepare("
             UPDATE laptops
@@ -330,6 +352,7 @@ layout_start('Dashboard'); ?><div class="hero">
             <p class="muted">Register laptops manually, then assign them to employees or find the right laptop for an employee.</p>
             <a class="button" href="add_laptop.php">Register laptop</a>
             <a class="button secondary" href="laptop_assignment.php">Laptop assignment</a>
+            <a class="button secondary" href="unassign_device.php">Return laptop</a>
         </div>
         <div class="panel">
             <h2>Maintenance intelligence</h2>

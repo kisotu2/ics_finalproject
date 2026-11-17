@@ -1,4 +1,3 @@
 <?php
-
-echo 'PHP Version: ' . PHP_VERSION . '<br>';
-echo 'PHP Binary: ' . PHP_BINARY;
+http_response_code(404);
+exit;

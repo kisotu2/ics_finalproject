@@ -1,4 +1,4 @@
-USE ira_assets;
+USE ira_assets_recovered;
 
 CREATE TABLE IF NOT EXISTS device_usage_daily (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

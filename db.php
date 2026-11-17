@@ -7,7 +7,7 @@ $config = is_file($configFile) ? require $configFile : [];
 $host = getenv('ASSET_DB_HOST') ?: ($config['db_host'] ?? '127.0.0.1');
 $user = getenv('ASSET_DB_USER') ?: ($config['db_user'] ?? 'root');
 $pass = getenv('ASSET_DB_PASSWORD') ?: ($config['db_password'] ?? '');
-$name = getenv('ASSET_DB_NAME') ?: ($config['db_name'] ?? 'ira_assets');
+$name = 'ira_assets_recovered';
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
@@ -18,6 +18,5 @@ try {
     http_response_code(500);
     error_log('Database connection failed with MySQL error code ' . (int) $exception->getCode() . '.');
 
-    // Development: show the actual database error
-    exit('Database connection failed: ' . $exception->getMessage());
+    exit('Database connection failed. Check the local database service and configuration.');
 }

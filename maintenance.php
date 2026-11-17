@@ -1,9 +1,7 @@
 <?php
 
 error_reporting(E_ALL);
-
 ini_set('display_errors', '1');
-
 ini_set('display_startup_errors', '1');
 
 require __DIR__ . '/bootstrap.php';
@@ -138,7 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $dateObject &&
 
-                $dateObject->format('Y-m-d') === $date;
+                $dateObject->format('Y-m-d') === $date &&
+                $date <= date('Y-m-d');
 
         }
 
@@ -268,6 +267,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash($message);
             }
 
+        } else {
+            flash('Choose a valid usage date up to today.', 'error');
         }
 
     /*
@@ -642,6 +643,8 @@ $risks = $conn->query("
 
         WHERE usage_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
 
+          AND usage_date <= CURDATE()
+
         GROUP BY laptop_id
 
     ) u ON u.laptop_id = l.id
@@ -975,6 +978,8 @@ layout_start('Maintenance');
                     type="date"
 
                     value="<?= date('Y-m-d') ?>"
+
+                    max="<?= date('Y-m-d') ?>"
 
                     required
 
@@ -1388,7 +1393,10 @@ layout_start('Maintenance');
 
                     <?php if ($r['active_hours_30d'] === null): ?>
 
-                        <span class="muted">No usage recorded in the last 30 days</span>
+                        <span class="muted">No usage recorded in the last 30 days</span><br>
+                        <?php if (!empty($prediction['success'])): ?>
+                            <small>Model input uses training mean: <?= number_format((float) $prediction['features']['active_hours_30d'], 1) ?> active hours</small>
+                        <?php endif; ?>
 
                     <?php else: ?>
 

@@ -383,6 +383,30 @@ layout_start('Users');
 
                     </td>
 
+                    <td>
+                        <?php if ($user['role'] !== 'super_admin' && (int) $user['id'] !== (int) $_SESSION['user_id']): ?>
+                            <form method="post" action="change_role.php" class="form-grid">
+                                <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+                                <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
+                                <label>Role
+                                    <select name="role">
+                                        <option value="user" <?= $user['role'] === 'user' ? 'selected' : '' ?>>User</option>
+                                        <option value="admin" <?= $user['role'] === 'admin' ? 'selected' : '' ?>>Administrator</option>
+                                    </select>
+                                </label>
+                                <button type="submit">Save role</button>
+                            </form>
+                            <form method="post" action="toggle_status.php" style="margin-top:8px">
+                                <input type="hidden" name="csrf" value="<?= e(csrf()) ?>">
+                                <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
+                                <input type="hidden" name="status" value="<?= $user['status'] === 'active' ? 'inactive' : 'active' ?>">
+                                <button class="secondary" type="submit"><?= $user['status'] === 'active' ? 'Deactivate' : 'Activate' ?></button>
+                            </form>
+                        <?php else: ?>
+                            <span class="muted">Protected account</span>
+                        <?php endif; ?>
+                    </td>
+
                 </tr>
 
             <?php endwhile; ?>
@@ -393,7 +417,7 @@ layout_start('Users');
                 <tr>
 
                     <td
-                        colspan="6"
+                        colspan="7"
                         class="empty-table"
                     >
                         No users registered.

@@ -1,4 +1,4 @@
-USE ira_assets;
+USE ira_assets_recovered;
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS organisation_rank VARCHAR(100) NULL AFTER department;
 ALTER TABLE laptops ADD COLUMN IF NOT EXISTS processor_tier ENUM('Standard','Performance','Workstation') NOT NULL DEFAULT 'Standard' AFTER department;

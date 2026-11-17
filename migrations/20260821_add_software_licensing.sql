@@ -1,4 +1,4 @@
-USE ira_assets;
+USE ira_assets_recovered;
 
 -- Run this upgrade once for an existing installation before using Software licences.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0;

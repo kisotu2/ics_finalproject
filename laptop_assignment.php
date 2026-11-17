@@ -13,16 +13,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $department = trim($_POST['department'] ?? '');
     $rank = trim($_POST['organisation_rank'] ?? '');
     $workType = trim($_POST['work_type'] ?? '');
-    if (!$userId || !$laptopId || !$department || !$rank || !$workType) {
-        flash('Complete the user, department, rank and work type fields.', 'error');
+    $validRanks = ['Staff', 'Officer', 'Manager', 'Senior manager', 'Director'];
+    $validWorkTypes = ['Administration', 'Finance', 'Development', 'Design', 'Data analysis'];
+    if (
+        !$userId || !$laptopId || $department === '' ||
+        mb_strlen($department, 'UTF-8') > 120 ||
+        !in_array($rank, $validRanks, true) ||
+        !in_array($workType, $validWorkTypes, true)
+    ) {
+        flash('Choose an active user and complete valid department, rank and work type values.', 'error');
     } else {
         $conn->begin_transaction();
         try {
-            $user = $conn->prepare('UPDATE users SET department = ?, organisation_rank = ? WHERE id = ? AND status = \'active\'');
-            $user->bind_param('ssi', $department, $rank, $userId); $user->execute();
-            $asset = $conn->prepare("UPDATE laptops SET assigned_to = ?, status = 'Assigned', department = ? WHERE id = ? AND status = 'Available'");
-            $asset->bind_param('isi', $userId, $department, $laptopId); $asset->execute();
-            if (!$asset->affected_rows) { throw new RuntimeException('The selected laptop is no longer available.'); }
+            $user = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'user' AND status = 'active' FOR UPDATE");
+            $user->bind_param('i', $userId);
+            $user->execute();
+            $validUser = $user->get_result()->fetch_assoc();
+            $user->close();
+            if (!$validUser) {
+                throw new RuntimeException('Select an active system user.');
+            }
+
+            // Locking the user row serializes assignments for that person, including when no laptop is assigned yet.
+            $existingAssignment = $conn->prepare('SELECT id FROM laptops WHERE assigned_to = ? LIMIT 1 FOR UPDATE');
+            $existingAssignment->bind_param('i', $userId);
+            $existingAssignment->execute();
+            $alreadyAssigned = $existingAssignment->get_result()->fetch_assoc();
+            $existingAssignment->close();
+            if ($alreadyAssigned) {
+                throw new RuntimeException('This user must return their currently assigned laptop before receiving another one.');
+            }
+
+            $asset = $conn->prepare("UPDATE laptops SET assigned_to = ?, status = 'Assigned', department = ? WHERE id = ? AND status = 'Available' AND assigned_to IS NULL");
+            $asset->bind_param('isi', $userId, $department, $laptopId);
+            $asset->execute();
+            if ($asset->affected_rows !== 1) {
+                $asset->close();
+                throw new RuntimeException('The selected laptop is no longer available.');
+            }
+            $asset->close();
+
+            $userUpdate = $conn->prepare('UPDATE users SET department = ?, organisation_rank = ? WHERE id = ?');
+            $userUpdate->bind_param('ssi', $department, $rank, $userId);
+            $userUpdate->execute();
+            $userUpdate->close();
             $history = $conn->prepare("INSERT INTO laptop_history (laptop_id,user_id,admin_id,action_type,action_date) VALUES (?,?,?,'Needs-based assignment',NOW())");
             $history->bind_param('iii', $laptopId, $userId, $_SESSION['user_id']); $history->execute();
             audit($conn, 'needs_based_assignment', 'laptop', $laptopId, ['user_id'=>$userId, 'department'=>$department, 'rank'=>$rank, 'work_type'=>$workType]);
